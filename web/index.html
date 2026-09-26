@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crowd Console</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<!-- pictogram icons (option A): referenced with <use href="#i-..."> so they are defined once -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-male" viewBox="0 0 64 64"><circle cx="25" cy="39" r="14" fill="none" stroke="currentColor" stroke-width="7"/><path d="M35 29 53 11M39 11h14v14" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-female" viewBox="0 0 64 64"><circle cx="32" cy="23" r="14" fill="none" stroke="currentColor" stroke-width="7"/><path d="M32 37v21M22 49h20" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/></symbol>
+  <symbol id="i-adult" viewBox="0 0 64 64"><circle cx="32" cy="8" r="5.5"/><path d="M22 18h20a4 4 0 0 1 4 4v17a3 3 0 0 1-6 0V25h-2v34a3.5 3.5 0 0 1-7 0V40h-2v19a3.5 3.5 0 0 1-7 0V25h-2v14a3 3 0 0 1-6 0V22a4 4 0 0 1 4-4z"/></symbol>
+  <symbol id="i-child" viewBox="0 0 64 64"><circle cx="32" cy="23" r="13"/><path d="M24 37h16a4 4 0 0 1 4 4v8a2.5 2.5 0 0 1-5 0v-5h-1.6v15a2.8 2.8 0 0 1-5.6 0v-8h-1.6v8a2.8 2.8 0 0 1-5.6 0V44H23v5a2.5 2.5 0 0 1-5 0v-8a4 4 0 0 1 4-4z"/></symbol>
+  <symbol id="i-visitors" viewBox="0 0 64 64"><circle cx="32" cy="12" r="7"/><path d="M23 22h18a4 4 0 0 1 4 4v14a3 3 0 0 1-6 0V30h-2v27a3.5 3.5 0 0 1-7 0V44h-2v13a3.5 3.5 0 0 1-7 0V30h-2v10a3 3 0 0 1-6 0V26a4 4 0 0 1 4-4z"/><g opacity=".45"><circle cx="12" cy="16" r="5"/><path d="M6 24h12a3 3 0 0 1 3 3v10a2 2 0 0 1-4 0v-7h-1v20a2.5 2.5 0 0 1-5 0V40h-1v10a2.5 2.5 0 0 1-5 0V30h-1v7a2 2 0 0 1-4 0V27a3 3 0 0 1 3-3z"/><circle cx="52" cy="16" r="5"/><path d="M46 24h12a3 3 0 0 1 3 3v10a2 2 0 0 1-4 0v-7h-1v20a2.5 2.5 0 0 1-5 0V40h-1v10a2.5 2.5 0 0 1-5 0V30h-1v7a2 2 0 0 1-4 0V27a3 3 0 0 1 3-3z"/></g></symbol>
+  <symbol id="i-entry" viewBox="0 0 64 64"><path d="M8 32h34M30 18l14 14-14 14M50 8h6v48h-6" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-exit" viewBox="0 0 64 64"><path d="M56 32H22M34 18L20 32l14 14M14 8H8v48h6" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-baseline" viewBox="0 0 64 64"><path d="M10 52h44M32 12v32M20 32l12 12 12-12" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-inside" viewBox="0 0 64 64"><path d="M8 26 32 8l24 18v30H8z" fill="none" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/><circle cx="32" cy="30" r="5"/><path d="M23 52v-6a9 9 0 0 1 18 0v6z"/></symbol>
+</svg>
+
+<!-- building day set-up: shown before the main panel until confirmed for today -->
+<div id="setup" class="setup hidden">
+  <form class="setup-card" id="setup-form" autocomplete="off">
+    <div class="setup-title">Building day set-up</div>
+    <div class="setup-sub">Confirm the operating day before monitoring starts. Hourly and closing totals are written to <code>output/history.csv</code>; the count restarts from the starting occupancy at opening time.</div>
+    <label>Site name <input name="name" type="text" required></label>
+    <div class="row3">
+      <label>Date <input name="date" type="date" required></label>
+      <label>Opening time <input name="open" type="time" required></label>
+      <label>Closing time <input name="close" type="time" required></label>
+    </div>
+    <div class="row3">
+      <label>Capacity (100 %) <input name="capacity" type="number" min="1" required></label>
+      <label>Warning at % <input name="warn_pct" type="number" min="1" max="100" required></label>
+      <label>Starting occupancy <input name="baseline" type="number" min="0" required></label>
+    </div>
+    <label class="check"><input name="apply_baseline" type="checkbox"> Set the current count to the starting occupancy now</label>
+    <label id="su-correct-wrap">People inside now <input name="current" type="number" min="0">
+      <span class="hint">Correct the running count from a head count at the door. Leave as-is to keep counting. Logged in history.csv.</span>
+    </label>
+    <div class="setup-actions">
+      <span class="setup-msg" id="setup-msg"></span>
+      <button type="button" class="tool cancel" id="setup-cancel">cancel</button>
+      <button type="submit" class="tool primary">Start monitoring</button>
+    </div>
+  </form>
+</div>
+
+<div id="grid" class="grid">
+
+  <!-- crowd management console (always the first tile) -->
+  <section class="panel console" id="console">
+    <header class="console-head">
+      <span class="console-title" id="site-name">Crowd Console</span>
+      <span class="session" id="session">–</span>
+      <span class="spacer"></span>
+      <span class="mode-badge" id="mode">–</span>
+      <button class="tool small" id="btn-add-camera" title="add a camera panel">+ camera</button>
+      <a href="#" class="link" id="btn-site">site</a>
+      <button class="icon expand" title="expand">⤢</button>
+    </header>
+
+    <div class="alarm-banner hidden" id="alarm-banner">
+      <div class="ab-title" id="ab-title">OVER CAPACITY</div>
+      <div class="ab-detail" id="ab-detail"></div>
+      <a href="#" class="ab-ack" id="ab-ack">acknowledge</a>
+    </div>
+
+    <div class="console-body">
+
+
+      <div class="section metrics">
+        <div class="metrics-vis">
+          <div class="section-head"><span class="label" id="vis-label">VISITORS TODAY</span><span class="sub" id="vis-sub">total number of visitors for the day</span><a href="#" class="link" id="btn-history">historical →</a></div>
+          <div class="vis-row">
+            <div class="vis-total" title="total number of visitors for the day"><span class="k">total visitors</span><div class="vt-row"><svg class="ico total big" role="img" aria-label="total visitors"><title>total visitors</title><use href="#i-visitors"/></svg><b class="huge total" id="v-total">0</b></div></div>
+            <div class="tile">
+              <div class="tile-row"><span class="tag male">MALE</span><svg class="ico male" role="img" aria-label="male"><title>male</title><use href="#i-male"/></svg><span class="num male" id="v-male">0</span><span class="num female" id="v-female">0</span><svg class="ico female" role="img" aria-label="female"><title>female</title><use href="#i-female"/></svg><span class="tag female">FEMALE</span></div>
+              <div class="bar"><i class="male" id="vbar-male"></i><i class="female" id="vbar-female"></i></div>
+            </div>
+            <div class="tile">
+              <div class="tile-row"><span class="tag adult">ADULT</span><svg class="ico adult" role="img" aria-label="adult"><title>adult</title><use href="#i-adult"/></svg><span class="num adult" id="v-adult">0</span><span class="num child" id="v-child">0</span><svg class="ico child" role="img" aria-label="child"><title>child</title><use href="#i-child"/></svg><span class="tag child">CHILD</span></div>
+              <div class="bar"><i class="adult" id="vbar-adult"></i><i class="child" id="vbar-child"></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="metrics-occ">
+          <div class="section-head"><span class="label" id="occ-label">CURRENT OCCUPANCY</span><span class="occ-level" id="occ-level">NORMAL</span><span class="sub" id="occ-sub">current number of visitors in the zone/area</span></div>
+          <div class="vis-total" title="people inside now — male plus female"><span class="k">people inside</span><div class="vt-row"><svg class="ico inside big" role="img" aria-label="people inside"><title>people inside</title><use href="#i-inside"/></svg><b class="huge" id="o-total">0</b></div></div>
+          <div class="occ-tiles">
+            <div class="tile">
+              <div class="tile-row"><span class="tag male">MALE</span><svg class="ico male" role="img" aria-label="male"><title>male</title><use href="#i-male"/></svg><span class="num male" id="o-male">0</span><span class="num female" id="o-female">0</span><svg class="ico female" role="img" aria-label="female"><title>female</title><use href="#i-female"/></svg><span class="tag female">FEMALE</span></div>
+              <div class="bar"><i class="male" id="obar-male"></i><i class="female" id="obar-female"></i></div>
+            </div>
+            <div class="tile">
+              <div class="tile-row"><span class="tag adult">ADULT</span><svg class="ico adult" role="img" aria-label="adult"><title>adult</title><use href="#i-adult"/></svg><span class="num adult" id="o-adult">0</span><span class="num child" id="o-child">0</span><svg class="ico child" role="img" aria-label="child"><title>child</title><use href="#i-child"/></svg><span class="tag child">CHILD</span></div>
+              <div class="bar"><i class="adult" id="obar-adult"></i><i class="child" id="obar-child"></i></div>
+            </div>
+          </div>
+          <div class="occ-meta muted" id="occ-meta">–</div>
+          <div class="assumed-note hidden" id="assumed-note"></div>
+        </div>
+        <div class="metrics-loc">
+          <div class="section-head"><span class="label">CAMERAS DEPLOYED</span><span class="sub" id="loc-sub">each camera</span></div>
+          <div class="loc-row" id="loc-row"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head">
+          <span class="label">ALERTS</span><span class="sub" id="alerts-sub">0 active</span>
+          <a href="#" class="link" id="ack-all">acknowledge all</a>
+        </div>
+        <ul class="alerts" id="alerts"></ul>
+      </div>
+
+      <div class="section">
+        <div class="section-head"><span class="label">CAMERAS</span><span class="sub" id="cams-sub">–</span></div>
+        <table class="tbl" id="cams">
+          <thead><tr><th>camera</th><th>status</th><th>fps</th><th>in / out</th><th>net</th><th>area cap.</th><th>M / F</th><th>A / C</th><th>line</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <div class="section-head"><span class="label">EVENTS</span><span class="sub" id="events-sub">latest crossings</span></div>
+        <table class="tbl" id="events">
+          <thead><tr><th>time</th><th>camera</th><th>event</th><th>gender</th><th>age</th><th>track</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <div class="section-head" id="history-head"><span class="label">HISTORY</span><span class="sub" id="hist-sub">output/history.csv</span></div>
+        <div class="hist-last" id="hist-last"></div>
+        <div class="hist-grid">
+          <div>
+            <div class="hist-title">Today</div>
+            <table class="tbl" id="hist-today">
+              <thead><tr><th>time</th><th>kind</th><th>inside</th><th>visitors</th><th>in / out</th><th>M / F</th><th>A / C</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div>
+            <div class="hist-title">Previous days (closing totals)</div>
+            <table class="tbl" id="hist-days">
+              <thead><tr><th>date</th><th>inside</th><th>visitors</th><th>in / out</th><th>M / F</th><th>A / C</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="hist-title">Recorded events</div>
+        <table class="tbl" id="hist-events">
+          <thead><tr><th>time</th><th>note</th><th>inside</th><th>clip</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+    </div>
+    <footer class="console-foot">
+      <a href="#" class="link" id="btn-pause">pause</a>
+      <a href="#" class="link" id="btn-reset">reset counters</a>
+      <span class="spacer"></span>
+      <span class="muted keys" title="hover a camera panel and press v; shift+V swaps them all"><b>v</b> swap feed · <b>shift+V</b> all</span>
+      <span class="muted" id="foot-info">–</span>
+    </footer>
+  </section>
+
+  <!-- camera panels are created from this template, one per camera slot -->
+  <template id="cam-tpl">
+    <section class="panel cam">
+      <header class="panel-head">
+        <span class="title">camera</span>
+        <span class="spacer"></span>
+        <span class="pill area hidden" title="area capacity"></span>
+        <span class="pill">RGB</span>
+        <span class="status"><i class="dot"></i><span class="fps">–</span></span>
+        <button class="icon source" title="camera source">⚙</button>
+        <button class="icon expand" title="expand">⤢</button>
+      </header>
+      <div class="panel-body">
+        <img class="feed" alt="">
+        <svg class="draft"></svg>
+        <div class="ribbon hidden"></div>
+        <div class="hud"></div>
+        <button class="add-camera">+ add camera</button>
+        <form class="source-form" autocomplete="off">
+          <div class="sf-title">Camera source</div>
+          <input class="sf-src" type="text" spellcheck="false" placeholder="rtsp://user:pass@host:554/stream  or  path/to/video.mp4">
+          <div class="sf-two">
+            <input class="sf-name" type="text" placeholder="display name (optional), e.g. Main entrance">
+            <input class="sf-area" type="number" min="0" placeholder="area capacity (0 = none)">
+          </div>
+          <div class="sf-row">
+            <button type="submit" class="tool connect">connect</button>
+            <button type="button" class="tool remove">remove camera</button>
+            <button type="button" class="tool remove-slot">remove panel</button>
+            <button type="button" class="tool cancel">cancel</button>
+            <span class="sf-msg"></span>
+          </div>
+        </form>
+        <div class="tools">
+          <button class="tool calibrate">calibrate</button>
+          <span class="calib-tools">
+            <span class="hint">click 2 points</span>
+            <button class="tool save" disabled>save</button>
+            <button class="tool flip">flip IN</button>
+            <button class="tool clear">clear</button>
+            <button class="tool del">delete line</button>
+            <button class="tool region" title="limit where this camera counts people">draw area</button>
+            <select class="tool region-role hidden" title="what the area is for">
+              <option value="count_inside">count only inside</option>
+              <option value="ignore_inside">ignore inside</option>
+              <option value="classify_inside">classify only inside</option>
+            </select>
+            <button class="tool del-region hidden">clear area</button>
+            <button class="tool done">done</button>
+          </span>
+          <button class="tool swap hidden" title="switch this panel between its video file and its live feed">video</button>
+          <button class="tool record" title="save a clip of this camera">● record</button>
+        </div>
+      </div>
+    </section>
+  </template>
+
+</div>
+
+<!-- small modal for inline edits (occupancy correction, capacity, record note) -->
+<div id="modal" class="modal hidden">
+  <form class="modal-card" id="modal-form" autocomplete="off">
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-fields" id="modal-fields"></div>
+    <div class="setup-actions">
+      <span class="setup-msg" id="modal-msg"></span>
+      <button type="button" class="tool cancel" id="modal-cancel">cancel</button>
+      <button type="submit" class="tool primary" id="modal-ok">apply</button>
+    </div>
+  </form>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# Install torch first with the CUDA build matching your driver, e.g.
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# then: pip install -r requirements.txt
+torch>=2.4
+torchvision
+ultralytics>=8.3
+opencv-python>=4.10
+transformers>=4.45
+numpy
+lap
+# browser console (webapp.py)
+fastapi>=0.115
+uvicorn[standard]>=0.30
+# demo footage fetch (download_demo_videos.py)
+yt-dlp

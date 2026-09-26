@@ -1,0 +1,27 @@
+# Ubuntu + NVIDIA GPU deployment of the browser console.
+# Requires Docker >= 24 and the NVIDIA Container Toolkit (nvidia-ctk runtime configure --runtime=docker).
+#   docker compose up --build                 # video mode, http://localhost:8780
+#   MODE=live docker compose up               # RTSP cameras listed in config/sources.json
+#   CAPACITY=150 docker compose up            # room capacity for the crowd alerts
+services:
+  console:
+    build: .
+    image: cv-demo-humanmonitor:cuda
+    command: ["--mode", "${MODE:-video}", "--capacity", "${CAPACITY:-100}", "--model", "/models/yolo11s.pt"]
+    ports:
+      - "8780:8780"
+    volumes:
+      - ./sample_data:/app/sample_data      # demo videos (python download_demo_videos.py on the host first)
+      - ./config:/app/config                # lines.json / sources.json are written by the UI
+      - ./output:/app/output                # events.csv
+      - models:/models                      # YOLO weights + HuggingFace CLIP cache (downloaded on first start)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+volumes:
+  models:

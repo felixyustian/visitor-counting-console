@@ -1,0 +1,9 @@
+.venv/
+.git/
+output/
+sample_data/
+*.mp4
+*.engine
+*.onnx
+__pycache__/
+.DS_Store

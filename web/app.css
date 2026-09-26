@@ -1,0 +1,945 @@
+/* Crowd console - dark operations theme. */
+:root {
+  --bg: #0b0d11;
+  --panel: #111318;
+  --panel-head: #15181e;
+  --border: #23262e;
+  --text: #d7dae0;
+  --muted: #7c8290;
+  --link: #4c8dff;
+  --green: #38c172;
+  --amber: #f5a524;
+  --red: #e5484d;
+  --male: #3caaff;
+  --female: #e65ac8;
+  --adult: #e6c850;
+  --child: #7878ff;
+  --draft: #00c8ff;
+  --font: Ubuntu, "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --mono: "Ubuntu Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 var(--font);
+  overflow: hidden;
+}
+a.link { color: var(--link); text-decoration: none; }
+a.link:hover { text-decoration: underline; }
+button { font: inherit; }
+.spacer { flex: 1; }
+.muted { color: var(--muted); }
+.muted b { color: var(--text); font-weight: 500; }
+.hidden { display: none !important; }
+code { font-family: var(--mono); font-size: .92em; color: #b8bcc4; }
+
+/* ------------------------------------------------------------ grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 6px;
+  padding: 6px;
+  height: 100vh;
+}
+/* the console keeps two cells once the grid is 3+ wide, so its three metric
+   columns still fit; declared before the expanded rules so those override it */
+.grid.wide-console > .panel.console { grid-column: span 2; }
+.grid.has-expanded .panel { display: none; }
+.grid.has-expanded .panel.expanded { display: flex; grid-column: 1 / -1; grid-row: 1 / -1; }
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ---------------------------------------------------- camera panel */
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  background: var(--panel-head);
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+}
+.panel-head .title { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill {
+  border: 1px solid #3a3e48;
+  border-radius: 9px;
+  padding: 0 7px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pill.area { color: var(--amber); border-color: #6b4a12; }
+.pill.area.over { color: #fff; background: var(--red); border-color: var(--red); }
+.status { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot.bad { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.dot.idle { background: var(--amber); }
+button.icon {
+  background: none; border: 0; color: var(--muted); cursor: pointer;
+  font-size: 14px; padding: 0 2px; line-height: 1;
+}
+button.icon:hover { color: var(--text); }
+
+.panel-body { position: relative; flex: 1; min-height: 0; background: #000; }
+.feed {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.draft { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.draft .handle { pointer-events: all; cursor: grab; }
+.draft .handle:active { cursor: grabbing; }
+.cam.calibrating .panel-body { cursor: crosshair; }
+.hud {
+  position: absolute; right: 8px; bottom: 8px;
+  font: 13px var(--mono);
+  color: #cfd3da;
+  background: rgba(0,0,0,.6);
+  padding: 4px 8px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.hud .in { color: var(--green); }
+.hud .out { color: var(--amber); }
+.hud .warn { color: var(--amber); }
+.hud b { font-size: 15px; color: #fff; }
+
+/* alarm state on a camera panel */
+.ribbon {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: 6px 10px;
+  background: rgba(229,72,77,.85);
+  color: #fff; font-weight: 700; font-size: 15px; letter-spacing: .05em; text-align: center;
+  pointer-events: none;
+  animation: blink 1.2s steps(2) infinite;
+}
+.cam.alarm { border-color: var(--red); box-shadow: inset 0 0 0 2px var(--red); }
+.cam.alarm .panel-head { background: #3a1416; }
+.cam.tipped, .cam.area-alarm { box-shadow: inset 0 0 0 4px var(--red), 0 0 18px rgba(229,72,77,.6); }
+.cam.tipped .ribbon, .cam.area-alarm .ribbon { background: rgba(229,72,77,.95); font-size: 17px; }
+
+.tools {
+  position: absolute; left: 8px; bottom: 8px;
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+.tool {
+  background: rgba(20,22,28,.88);
+  border: 1px solid #3a3e48;
+  color: #c9cdd4;
+  border-radius: 3px;
+  padding: 4px 9px;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tool:hover { border-color: #5a606c; color: #fff; }
+.tool:disabled { opacity: .45; cursor: default; }
+.tool.small { padding: 2px 8px; font-size: 12px; }
+.tool.primary { border-color: var(--link); color: #fff; background: var(--link); }
+.tool.save:not(:disabled) { border-color: var(--green); color: var(--green); }
+.tool.del, .tool.remove, .tool.remove-slot { color: #f08a8e; }
+.tool.done { border-color: var(--link); color: var(--link); }
+.tool.record { color: #f08a8e; }
+/* the area-role picker: a <select> styled as one of the tool buttons, tinted to
+   match the rectangle it will draw so the choice reads without opening it */
+select.tool {
+  appearance: none; -webkit-appearance: none; padding-right: 19px; font-family: inherit;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 9px center, right 5px center;
+  background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+}
+select.tool option { background: #14161c; color: #c9cdd4; }
+.region-role[data-role="count_inside"] { border-color: #ffb020; color: #ffb020; }
+.region-role[data-role="ignore_inside"] { border-color: #eb5050; color: #eb5050; }
+.region-role[data-role="classify_inside"] { border-color: #3cb4eb; color: #3cb4eb; }
+.cam.recording .tool.record { background: var(--red); color: #fff; border-color: var(--red); animation: blink 1s steps(2) infinite; }
+.calib-tools { display: none; align-items: center; gap: 4px; }
+.calib-tools .hint { color: var(--draft); font-size: 12.5px; margin: 0 4px; }
+.cam.calibrating .calibrate { display: none; }
+.cam.calibrating .calib-tools { display: inline-flex; }
+.cam.calibrating .tool.record { display: none; }
+
+/* camera source editor */
+.add-camera {
+  display: none;
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  background: rgba(20,22,28,.9); border: 1px dashed #4a4f5b; color: var(--link);
+  border-radius: 4px; padding: 12px 20px; font-size: 16px; cursor: pointer;
+}
+.add-camera:hover { border-color: var(--link); }
+.cam.empty .add-camera { display: block; }
+.cam.empty .tools, .cam.empty .hud { display: none; }
+.cam.editing .add-camera { display: none; }
+.source-form {
+  display: none;
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(560px, 94%);
+  background: rgba(17,19,24,.97); border: 1px solid #3a3e48; border-radius: 4px;
+  padding: 12px 14px 12px; box-shadow: 0 8px 30px rgba(0,0,0,.6);
+  z-index: 3;
+}
+.cam.editing .source-form { display: block; }
+.sf-title { font-size: 11.5px; font-weight: 600; letter-spacing: .06em; color: #b8bcc4; margin-bottom: 8px; }
+.source-form input, .modal input, .setup-card input[type=text], .setup-card input[type=number], .setup-card input[type=date], .setup-card input[type=time] {
+  display: block; width: 100%; margin-bottom: 6px;
+  background: #0b0d11; border: 1px solid #3a3e48; border-radius: 3px;
+  color: var(--text); font: 13.5px var(--mono); padding: 7px 9px;
+  color-scheme: dark;
+}
+.source-form input:focus, .modal input:focus, .setup-card input:focus { outline: none; border-color: var(--link); }
+.sf-two { display: grid; grid-template-columns: 2fr 1fr; gap: 6px; }
+.sf-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.sf-row .connect { border-color: var(--green); color: var(--green); }
+.sf-msg { font-size: 12px; color: var(--muted); margin-left: 4px; }
+.sf-msg.err { color: #ff7b7f; }
+
+/* ---------------------------------------------------- console panel */
+.console-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px 7px;
+  border-bottom: 1px solid var(--border);
+}
+.console-title { font-size: 17px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* When the header runs out of room the site name is the last thing that should
+   go, so the session id takes the shrink (200 : 1) and truncates instead.
+   The title also grows into the spacer's free space: at its natural width the
+   used size rounds a fraction of a pixel short of the text and Chrome then
+   ellipsises a whole word, so it needs the slack rather than an exact fit. */
+.console-title { flex: 1 1 auto; min-width: 0; }
+.session {
+  color: var(--muted); font-size: 11px; font-family: var(--mono);
+  flex: 0 200 auto; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mode-badge {
+  border: 1px solid #3a3e48; border-radius: 3px;
+  padding: 1px 8px; font-size: 11px; letter-spacing: .04em;
+  color: var(--muted); white-space: nowrap;
+}
+.mode-badge.live { color: var(--red); border-color: var(--red); }
+.mode-badge.video { color: var(--link); border-color: var(--link); }
+.mode-badge.empty { color: var(--amber); border-color: var(--amber); }
+
+.alarm-banner {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 14px;
+  background: var(--red); color: #fff;
+  animation: blink 1.2s steps(2) infinite;
+}
+.alarm-banner.warn { background: var(--amber); color: #1a1200; animation: none; }
+.ab-title { font-size: 22px; font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
+.ab-detail { font-size: 14px; flex: 1; }
+.ab-ack { color: inherit; font-size: 13px; text-decoration: underline; }
+
+.console-body { flex: 1; overflow-y: auto; padding: 4px 12px 8px; }
+.console-body::-webkit-scrollbar { width: 8px; }
+.console-body::-webkit-scrollbar-thumb { background: #2a2e37; border-radius: 4px; }
+
+.section { padding: 9px 0 11px; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: 0; }
+.section-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.section-head .label { font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #b8bcc4; }
+.section-head .sub { font-size: 11.5px; color: var(--muted); }
+.section-head .link { font-size: 13px; margin-left: 2px; }
+
+/* occupancy */
+.editable { background: none; border: 0; padding: 0; color: inherit; cursor: pointer; border-bottom: 1px dashed transparent; }
+.editable:hover { border-bottom-color: var(--link); }
+.occ-level {
+  margin-bottom: 8px;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .06em;
+  border: 1px solid var(--green); color: var(--green);
+}
+.occ-level.busy { border-color: var(--link); color: var(--link); }
+.occ-level.crowded { border-color: var(--amber); color: var(--amber); }
+.occ-level.over { border-color: var(--red); color: #fff; background: var(--red); animation: blink 1.2s steps(2) infinite; }
+@keyframes blink { to { opacity: .55; } }
+.occ-meta { font-size: 12.5px; margin: 4px 0 8px; }
+.inout { display: flex; gap: 26px; }
+.inout .k { display: block; font-size: 11.5px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.inout .big { font-size: 30px; font-weight: 500; line-height: 1.1; }
+.inout .in { color: var(--green); }
+.inout .out { color: var(--amber); }
+.spark { display: block; width: 100%; height: 34px; margin-top: 10px; }
+.spark path.line { fill: none; stroke: var(--green); stroke-width: 1.5; }
+.spark path.area { fill: rgba(56,193,114,.12); stroke: none; }
+.spark line.cap { stroke: var(--red); stroke-width: 1; stroke-dasharray: 3 3; }
+
+/* alerts */
+.alerts { list-style: none; margin: 0; padding: 0; }
+.alerts li { padding: 3px 0 6px; }
+.alerts .t { font-size: 14px; }
+.alerts .t.critical { color: #ff7b7f; font-weight: 600; }
+.alerts .t.warning { color: var(--amber); }
+.alerts .t.info { color: #c9cdd4; }
+.alerts .d { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+.alerts .d .link { margin-left: 6px; }
+.alerts li.acked .t { color: var(--muted); font-weight: 400; text-decoration: line-through; }
+.alerts .empty { color: var(--muted); font-size: 13px; }
+
+/* demographics */
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { background: #14171d; border: 1px solid var(--border); border-radius: 3px; padding: 8px 10px 9px; }
+.tile-row { display: grid; grid-template-columns: auto 1fr 1fr auto; align-items: baseline; gap: 8px; }
+.tag { font-size: 11px; letter-spacing: .06em; font-weight: 700; }
+.num { font-size: 36px; font-weight: 600; line-height: 1.05; }
+.num:nth-child(2) { text-align: right; padding-right: 8px; border-right: 1px solid var(--border); }
+.num:nth-child(3) { text-align: left; padding-left: 8px; }
+.tag.male, .num.male { color: var(--male); }
+.tag.female, .num.female { color: var(--female); }
+.tag.adult, .num.adult { color: var(--adult); }
+.tag.child, .num.child { color: var(--child); }
+.bar { display: flex; height: 6px; margin-top: 8px; border-radius: 3px; overflow: hidden; background: #22252d; }
+.bar i { display: block; height: 100%; transition: width .3s; }
+.bar i.male { background: var(--male); }
+.bar i.female { background: var(--female); }
+.bar i.adult { background: var(--adult); }
+.bar i.child { background: var(--child); }
+
+/* tables */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tbl th { text-align: left; font-weight: 400; color: var(--muted); padding: 2px 6px 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.tbl td { padding: 5px 6px 5px 0; border-bottom: 1px solid #1a1d24; white-space: nowrap; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl .mono { font-family: var(--mono); font-size: 13px; }
+.tbl .num-cell { font-size: 15px; font-weight: 500; }
+.tbl .entry { color: var(--green); font-weight: 600; }
+.tbl .exit { color: var(--amber); font-weight: 600; }
+.tbl .bad { color: var(--red); }
+.tbl .warn { color: var(--amber); }
+.tbl .ok { color: var(--green); }
+.tbl .M { color: var(--male); } .tbl .F { color: var(--female); }
+.tbl .A { color: var(--adult); } .tbl .C { color: var(--child); }
+.tbl .q { color: var(--muted); }
+.tbl .empty td { color: var(--muted); }
+.tbl tr.alarm-row td { color: #ff7b7f; }
+.tbl td.wrap { white-space: normal; }
+
+/* history */
+.hist-last { display: flex; gap: 22px; flex-wrap: wrap; background: #14171d; border: 1px solid var(--border); border-radius: 3px; padding: 8px 12px; margin-bottom: 10px; }
+.hist-last .k { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.hist-last .v { font-size: 24px; font-weight: 500; }
+.hist-last .v.small { font-size: 15px; }
+.hist-last .empty { color: var(--muted); font-size: 13px; }
+.hist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 8px; }
+.hist-title { font-size: 11.5px; color: #b8bcc4; letter-spacing: .05em; margin: 4px 0 4px; }
+
+.console-foot {
+  display: flex; align-items: center; gap: 14px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.console-foot .muted { font-size: 12px; font-family: var(--mono); }
+
+/* set-up screen and modal */
+.setup, .modal {
+  position: fixed; inset: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(5,6,8,.92);
+}
+.modal { background: rgba(5,6,8,.7); }
+.setup-card, .modal-card {
+  width: min(640px, 94%);
+  background: var(--panel); border: 1px solid #3a3e48; border-radius: 5px;
+  padding: 20px 22px 16px; box-shadow: 0 12px 40px rgba(0,0,0,.7);
+}
+.modal-card { width: min(440px, 94%); }
+.setup-title, .modal-title { font-size: 20px; font-weight: 500; margin-bottom: 6px; }
+.setup-sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+.setup-card label, .modal label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+.setup-card label input, .modal label input { margin-top: 4px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+label.check { display: flex; align-items: center; gap: 8px; color: var(--text); margin: 4px 0 10px; }
+label.check input { width: auto; margin: 0; }
+.setup-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.setup-msg { flex: 1; font-size: 12.5px; color: #ff7b7f; }
+.modal-fields .hint { font-size: 12px; color: var(--muted); margin: -2px 0 8px; }
+
+/* toast */
+.toast {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  background: #1c1f26; border: 1px solid #3a3e48; color: var(--text);
+  padding: 7px 14px; border-radius: 3px; font-size: 13.5px; z-index: 30;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.toast.show { opacity: 1; }
+
+/* narrow screens: stack */
+@media (max-width: 900px) {
+  body { overflow: auto; }
+  .grid { grid-template-columns: 1fr !important; grid-auto-rows: auto; height: auto; }
+  .panel.cam { height: 56vw; }
+  .panel.console { height: 90vh; }
+  .hist-grid { grid-template-columns: 1fr; }
+}
+
+/* =====================================================================
+   Information panel: light grey, high-contrast, 18 px base.
+   Scoped to .console so the camera panels keep the dark video theme.
+   ===================================================================== */
+.panel.console {
+  --c-bg: #e3e6eb;
+  --c-head: #d5d9e0;
+  --c-tile: #f5f6f8;
+  --c-border: #b9bfc9;
+  --c-text: #14161a;
+  --c-muted: #3f4650;
+  --link: #1d4ed8;
+  --green: #15803d;     /* entries */
+  --amber: #c2410c;     /* exits */
+  --red: #dc2626;
+  --total: #4338ca;     /* total visitors */
+  --male: #0b5ed7;
+  --female: #be185d;
+  --adult: #92400e;
+  --child: #6d28d9;
+  --mono: "Ubuntu Mono", "SF Mono", Menlo, Consolas, monospace;
+  background: var(--c-bg);
+  color: var(--c-text);
+  border-color: var(--c-border);
+  font-size: 18px;
+  line-height: 1.35;
+}
+.console .muted, .console .session { color: var(--c-muted); }
+.console .muted b { color: var(--c-text); }
+.console code { color: var(--c-text); }
+.console .console-head { background: var(--c-head); border-bottom-color: var(--c-border); padding: 9px 12px 8px; }
+.console .console-title { font-size: 22px; font-weight: 600; }
+.console .session { font-size: 12px; }
+.console .mode-badge { font-size: 12px; border-color: var(--c-border); color: var(--c-muted); }
+.console .mode-badge.live { color: var(--red); border-color: var(--red); }
+.console .mode-badge.video { color: var(--link); border-color: var(--link); }
+.console .mode-badge.empty { color: var(--amber); border-color: var(--amber); }
+.console .tool { background: #fff; border-color: var(--c-border); color: var(--c-text); font-size: 14px; }
+.console .tool:hover { border-color: var(--link); color: var(--link); }
+.console .tool.small { font-size: 14px; padding: 3px 10px; }
+.console button.icon { color: var(--c-muted); font-size: 16px; }
+.console button.icon:hover { color: var(--c-text); }
+.console a.link { color: var(--link); font-weight: 500; }
+
+.console .alarm-banner { padding: 12px 16px; }
+.console .ab-title { font-size: 26px; }
+.console .ab-detail { font-size: 17px; }
+.console .ab-ack { font-size: 15px; }
+.console .alarm-banner.warn { color: #1a1200; }
+
+.console .console-body { padding: 4px 14px 10px; }
+.console .console-body::-webkit-scrollbar-thumb { background: #aab0ba; }
+.console .section { border-bottom-color: var(--c-border); padding: 11px 0 13px; }
+.console .section-head .label { font-size: 14px; color: var(--c-text); letter-spacing: .08em; }
+.console .section-head .sub { font-size: 14px; color: var(--c-muted); }
+.console .section-head .link { font-size: 15px; }
+
+/* occupancy */
+.console .occ-level { font-size: 14px; padding: 4px 12px; margin-bottom: 10px; }
+.console .occ-meta { font-size: 15px; margin: 6px 0 10px; }
+.console .editable:hover { border-bottom-color: var(--link); }
+.console .inout { gap: 34px; }
+.console .inout .k { font-size: 13px; font-weight: 600; color: var(--c-muted); }
+.console .inout .big { font-size: 38px; font-weight: 700; }
+.console .inout .in { color: var(--green); }
+.console .inout .out { color: var(--amber); }
+.console .spark path.area { fill: rgba(21,128,61,.15); }
+.console .spark path.line { stroke: var(--green); stroke-width: 2; }
+.console .spark line.cap { stroke: var(--red); }
+
+/* visitors today */
+.console .vis-row { display: flex; gap: 20px; align-items: stretch; }
+.console .vis-total { display: flex; flex-direction: column; justify-content: center; min-width: 190px; padding: 6px 16px 8px; background: #eef0ff; border: 2px solid var(--total); border-radius: 4px; }
+.console .vis-total .k { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--total); }
+.console .huge { font-size: 64px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+.console .total { color: var(--total); }
+.console .vis-split { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.console .in { color: var(--green); }
+.console .out { color: var(--amber); }
+
+/* demographic tiles */
+.console .two { gap: 12px; }
+.console .tile { background: var(--c-tile); border: 1px solid var(--c-border); }
+.console .tag { font-size: 12.5px; }
+.console .num { font-size: 40px; font-weight: 700; }
+.console .num:nth-child(2) { border-right-color: var(--c-border); }
+.console .bar { background: #cfd4dc; height: 8px; }
+
+/* alerts */
+.console .alerts .t { font-size: 17px; }
+.console .alerts .t.critical { color: var(--red); }
+.console .alerts .t.warning { color: var(--amber); font-weight: 600; }
+.console .alerts .t.info { color: var(--c-text); }
+.console .alerts .d { font-size: 13.5px; color: var(--c-muted); }
+.console .alerts li.acked .t { color: var(--c-muted); }
+.console .alerts .empty { color: var(--c-muted); font-size: 16px; }
+
+/* tables */
+.console .tbl { font-size: 16px; }
+.console .tbl th { font-size: 13px; color: var(--c-muted); font-weight: 600; border-bottom-color: var(--c-border); }
+.console .tbl td { border-bottom-color: #d3d7de; padding: 6px 8px 6px 0; }
+.console .tbl .mono { font-size: 15px; }
+.console .tbl .num-cell { font-size: 18px; font-weight: 600; }
+.console .tbl .q { color: var(--c-muted); }
+.console .tbl .empty td { color: var(--c-muted); }
+.console .tbl tr.alarm-row td { color: var(--red); font-weight: 600; }
+.console .tbl .ok { color: var(--green); }
+.console .tbl .bad { color: var(--red); }
+.console .tbl .warn { color: var(--amber); }
+
+/* history */
+.console .hist-last { background: var(--c-tile); border-color: var(--c-border); gap: 28px; padding: 10px 14px; }
+.console .hist-last .k { font-size: 12.5px; color: var(--c-muted); font-weight: 600; }
+.console .hist-last .v { font-size: 28px; font-weight: 700; }
+.console .hist-last .v.small { font-size: 17px; font-weight: 500; }
+.console .hist-last .empty { color: var(--c-muted); font-size: 15px; }
+.console .hist-title { font-size: 13.5px; color: var(--c-text); font-weight: 600; }
+
+.console .console-foot { border-top-color: var(--c-border); background: var(--c-head); font-size: 15px; }
+.console .console-foot .muted { font-size: 13px; }
+
+/* pop-ups and the set-up screen share the grey scheme */
+.setup-card, .modal-card {
+  background: #e3e6eb; color: #14161a; border-color: #b9bfc9;
+}
+.setup-title, .modal-title { font-size: 24px; }
+.setup-sub, .modal-fields .hint { color: #3f4650; font-size: 15px; }
+.setup-sub code { color: #14161a; }
+.setup-card label, .modal label { color: #3f4650; font-size: 15px; }
+.setup-card input, .modal input { background: #fff; border-color: #b9bfc9; color: #14161a; font-size: 16px; }
+.setup-card input:focus, .modal input:focus { border-color: #1d4ed8; }
+label.check { color: #14161a; }
+.setup-card .tool, .modal .tool { background: #fff; border-color: #b9bfc9; color: #14161a; font-size: 15px; }
+.setup-card .tool.primary, .modal .tool.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.setup-msg { color: #dc2626; }
+.setup-card input, .modal input { color-scheme: light; }
+/* keep the first screen compact: occupancy + visitors + start of alerts fit at 1080p */
+.console .section { padding: 5px 0 6px; }
+.console .occ-meta { margin: 4px 0 6px; }
+.console .inout .big { font-size: 34px; }
+.console .spark { height: 22px; margin-top: 6px; }
+.console .huge { font-size: 56px; }
+.console .num { font-size: 36px; }
+.console .vis-total { min-width: 170px; padding: 4px 14px 6px; }
+
+/* metrics row: occupancy on the left, visitors today + inside now on the right; logs keep the space below */
+.console .metrics { display: grid; grid-template-columns: minmax(300px, 34%) 1fr; gap: 0 22px; align-items: start; }
+.console .metrics-occ .occ-level { display: inline-block; margin: 3px 0 0; }
+.console .metrics-occ .occ-meta { margin: 3px 0 4px; font-size: 14px; }
+.console .metrics-occ .inout { gap: 22px; }
+.console .metrics-occ .inout .big { font-size: 30px; }
+.console .metrics-vis .vis-row { display: grid; grid-template-columns: auto 1fr 1fr; gap: 10px; align-items: stretch; }
+.console .metrics .vis-total { min-width: 150px; padding: 2px 9px 3px; }
+.console .metrics-vis .huge { font-size: 46px; }
+.console .metrics .tile { padding: 3px 7px 4px; }
+.console .metrics .num { font-size: 30px; }
+.console .metrics-vis .inside-head { margin: 5px 0 2px; }
+.console .metrics-vis .inside-row { grid-template-columns: 1fr 1fr; }
+@media (max-width: 1500px) { .console .metrics { grid-template-columns: 1fr; gap: 8px; } }
+
+/* --- fit the metrics row to the panel width (container queries on the console body) --- */
+.console .console-body { container: consolebox / inline-size; }
+
+/* The header sits outside .console-body, so it needs its own container to
+   respond to the panel width. Safe here: the only fixed/absolute overlays
+   (#setup, #modal, #toast) live outside this section, so making the panel a
+   containing block does not move them. */
+.panel.console { container: consolepanel / inline-size; }
+.console .metrics { grid-template-columns: minmax(230px, 30%) minmax(0, 1fr); }
+.console .metrics-occ, .console .metrics-vis, .console .vis-row, .console .tile, .console .vis-total { min-width: 0; }
+.console .metrics-vis .vis-row { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); }
+.console .metrics-vis .inside-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.console .tile-row { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto; gap: 6px; }
+.console .tile-row .num { overflow: hidden; }
+
+/* panel narrower than ~1000 px (2x2 grid on a 1920 screen is ~940 px) */
+@container consolebox (max-width: 1000px) {
+  .console .metrics { grid-template-columns: minmax(210px, 28%) minmax(0, 1fr); gap: 0 14px; }
+  .console .metrics-occ .inout { gap: 14px; }
+  .console .metrics-occ .inout .big { font-size: 26px; }
+  .console .metrics-occ .occ-meta { font-size: 13px; }
+  .console .metrics .vis-total { min-width: 110px; padding: 4px 10px 6px; }
+  .console .metrics .vis-total .k { font-size: 11px; }
+  .console .metrics-vis .huge { font-size: 36px; }
+  .console .metrics .tile { padding: 5px 8px 7px; }
+  .console .metrics .num { font-size: 24px; }
+  .console .metrics .tag { font-size: 10.5px; }
+  .console .section-head .sub { font-size: 12.5px; }
+}
+/* panel narrower than ~820 px (2x2 grid on a 1600 screen, or 3 columns on 1920): keep two columns, smaller type */
+@container consolebox (max-width: 820px) {
+  .console .metrics { grid-template-columns: minmax(180px, 27%) minmax(0, 1fr); gap: 0 10px; }
+  .console .metrics-occ .occ-level { font-size: 11.5px; padding: 2px 8px; }
+  .console .metrics-occ .occ-meta { font-size: 12px; margin: 4px 0 6px; }
+  .console .metrics-occ .inout { gap: 10px; }
+  .console .metrics-occ .inout .k { font-size: 11px; }
+  .console .metrics-occ .inout .big { font-size: 22px; }
+  .console .metrics .vis-total { min-width: 88px; padding: 3px 8px 5px; }
+  .console .metrics .vis-total .k { font-size: 10px; letter-spacing: .03em; }
+  .console .metrics-vis .huge { font-size: 28px; }
+  .console .metrics .tile { padding: 4px 7px 6px; }
+  .console .metrics .num { font-size: 20px; }
+  .console .metrics .tag { font-size: 9.5px; }
+  .console .metrics .tile-row { gap: 4px; }
+  .console .metrics-vis .inside-head { margin: 6px 0 3px; }
+  .console .metrics .bar { height: 6px; margin-top: 5px; }
+  .console .section-head .label { font-size: 12.5px; }
+  .console .section-head .sub { font-size: 11.5px; }
+}
+/* narrower than ~620 px: one column, occupancy numbers beside each other */
+@container consolebox (max-width: 620px) {
+  .console .metrics { grid-template-columns: 1fr; gap: 6px; }
+  .console .metrics-occ .occ-level { display: inline-block; width: auto; }
+  .console .metrics-vis .vis-row { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); }
+}
+/* very narrow (a 4-column grid): stack the visitor tiles */
+@container consolebox (max-width: 460px) {
+  .console .metrics-vis .vis-row, .console .metrics-vis .inside-row { grid-template-columns: minmax(0, 1fr); }
+  .console .metrics .vis-total { flex-direction: row; align-items: baseline; gap: 12px; }
+}
+
+/* ---------------- pictogram icons (option A), beside the words ---------------- */
+.ico { display: inline-block; width: 1em; height: 1em; fill: currentColor; vertical-align: middle; flex: none; }
+.ico.male { color: var(--male); } .ico.female { color: var(--female); }
+.ico.adult { color: var(--adult); } .ico.child { color: var(--child); }
+.ico.total { color: var(--total); }
+.console .tile-row { grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 6px; }
+.console .tile-row .ico { width: 30px; height: 30px; }
+.console .tile-row .num:nth-child(3) { text-align: right; padding-right: 8px; border-right: 1px solid var(--c-border); }
+.console .tile-row .num:nth-child(4) { text-align: left; padding-left: 8px; border-right: 0; }
+.console .vis-total .vt-row { display: flex; align-items: center; gap: 8px; }
+.console .vis-total .ico.big { width: 40px; height: 40px; }
+@container consolebox (max-width: 1000px) {
+  .console .tile-row .ico { width: 24px; height: 24px; }
+  .console .vis-total .ico.big { width: 32px; height: 32px; }
+}
+@container consolebox (max-width: 820px) {
+  .console .tile-row { gap: 4px; }
+  .console .tile-row .ico { width: 20px; height: 20px; }
+  .console .vis-total .ico.big { width: 26px; height: 26px; }
+}
+
+/* ---------- camera selector, arithmetic line, assumed-share marker ---------- */
+
+/* the identity that explains "4 visitors but 6 inside" */
+
+/* the share of "inside now" that came from the assumed opening count, not from a camera */
+.console .bar i.assumed {
+  background: repeating-linear-gradient(45deg, #9aa1ac, #9aa1ac 4px, #b3b9c3 4px, #b3b9c3 8px);
+}
+.console .assumed-note {
+  font-size: 13px; color: var(--c-muted); margin-top: 4px;
+  border-left: 3px solid #9aa1ac; padding-left: 8px;
+}
+.console .assumed-note.warn { color: var(--amber); border-left-color: var(--amber); font-weight: 600; }
+
+@container consolebox (max-width: 820px) {
+  .console .assumed-note { font-size: 12px; }
+}
+
+/* ---------------- BY LOCATION: one card per entrance ---------------- */
+.console .loc-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.console .loc-card {
+  background: var(--c-tile); border: 1px solid var(--c-border); border-radius: 4px;
+  padding: 4px 7px 5px; cursor: pointer; transition: border-color .15s;
+}
+.console .loc-card:hover { border-color: var(--link); }
+.console .loc-card.on { border-color: var(--link); box-shadow: inset 0 0 0 1px var(--link); }
+.console .loc-card.alarm { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
+.console .loc-name {
+  font-size: 13.5px; font-weight: 600; color: var(--c-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;
+}
+.console .loc-name .bad { color: var(--red); font-weight: 500; font-size: 12px; }
+.console .loc-total { display: flex; align-items: baseline; gap: 8px; }
+.console .loc-total .k { font-size: 11.5px; color: var(--c-muted); text-transform: uppercase; letter-spacing: .05em; }
+.console .loc-total b { font-size: 30px; font-weight: 700; }
+.console .loc-split { display: flex; gap: 14px; flex-wrap: wrap; margin: 5px 0 4px; font-size: 16px; }
+.console .loc-split span { display: inline-flex; align-items: center; gap: 3px; }
+.console .loc-split b { font-weight: 700; }
+.console .loc-split .sep { color: var(--c-border); }
+.console .loc-split .ico { width: 17px; height: 17px; }
+.console .loc-empty { color: var(--c-muted); font-size: 14px; }
+@container consolebox (max-width: 820px) {
+  .console .loc-row { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 7px; }
+  .console .loc-card { padding: 6px 8px 7px; }
+  .console .loc-total b { font-size: 24px; }
+  .console .loc-split { font-size: 14px; gap: 10px; }
+}
+
+/* on-frame visitor metrics */
+.hud { text-align: right; line-height: 1.45; padding: 5px 9px; }
+.hud .hud-line { display: block; white-space: nowrap; }
+.hud .hud-k { color: #9aa3b0; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; margin-right: 6px; }
+.hud .hud-big { font-size: 21px; font-weight: 700; color: #fff; margin-right: 9px; }
+.hud .hud-sub { font-size: 13px; }
+.hud .hud-flow { font-size: 12.5px; color: #aeb5c0; margin-top: 1px; }
+/* who is in shot right now - same shape as the net-visitors line above it, a size
+   down, because it is the supporting figure rather than the headline */
+.hud .hud-here { margin-top: 2px; }
+.hud .hud-mid { font-size: 17px; font-weight: 700; color: #fff; margin-right: 8px; }
+.hud .hud-here .unk { color: #9aa1ad; }
+.hud .male { color: #7ec4ff; } .hud .female { color: #ff8ad8; }
+.hud .adult { color: #ffd76a; } .hud .child { color: #b9a6ff; }
+
+/* =======================================================================
+   Larger type across the information panel, and the merged net block.
+   These come last so they win over the earlier sizing at equal specificity.
+   ======================================================================= */
+.panel.console { font-size: 19px; }
+.console .console-title { font-size: 19px; }
+.console .section-head .label { font-size: 15px; }
+.console .section-head .sub { font-size: 14.5px; }
+
+.console .metrics-occ .occ-level { font-size: 15px; padding: 4px 12px; }
+.console .metrics-occ .occ-meta { font-size: 15px; }
+.console .metrics-occ .inout .k { font-size: 13px; }
+.console .metrics-occ .inout .big { font-size: 40px; }
+
+.console .metrics-vis .huge { font-size: 68px; }
+.console .metrics .num { font-size: 44px; }
+.console .metrics .tag { font-size: 12.5px; }
+.console .metrics .tile-row .ico { width: 36px; height: 36px; }
+.console .vis-total .k { font-size: 14px; }
+.console .vis-total .ico.big { width: 50px; height: 50px; }
+
+/* "entered N · left N" under the net block */
+.console .loc-head { margin-top: 14px; }
+
+.console .loc-name { font-size: 15px; }
+.console .loc-total .k { font-size: 13px; }
+.console .loc-total b { font-size: 36px; }
+.console .loc-split { font-size: 19px; }
+.console .loc-split .ico { width: 20px; height: 20px; }
+.console .alerts .t { font-size: 18px; }
+.console .alerts .d { font-size: 14px; }
+.console .tbl { font-size: 17px; }
+.console .tbl th { font-size: 13.5px; }
+.console .tbl .num-cell { font-size: 19px; }
+.console .hist-last .v { font-size: 32px; }
+.console .console-foot { font-size: 15px; }
+
+/* the cards now live in the narrower right column, so they fit more per row */
+.console .loc-row { grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 9px; }
+
+@container consolebox (max-width: 1000px) {
+  .console .metrics-occ .inout .big { font-size: 32px; }
+  .console .metrics-vis .huge { font-size: 46px; }
+  .console .metrics .num { font-size: 32px; }
+  .console .metrics .tile-row .ico { width: 27px; height: 27px; }
+  .console .loc-total b { font-size: 28px; }
+  .console .loc-split { font-size: 16px; }
+}
+@container consolebox (max-width: 820px) {
+  .console .metrics-occ .inout .big { font-size: 26px; }
+  .console .metrics-vis .huge { font-size: 36px; }
+  .console .metrics .num { font-size: 25px; }
+  .console .metrics .tile-row .ico { width: 22px; height: 22px; }
+  .console .loc-row { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 6px; }
+  .console .loc-total b { font-size: 23px; }
+  .console .loc-split { font-size: 14px; }
+  .console .loc-name { font-size: 13px; }
+  .console .tbl { font-size: 15px; }
+}
+
+/* ============ three equal columns: occupancy | visitors | by location ============ */
+.console .metrics {
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 0 12px;
+}
+.console .metrics-loc { min-width: 0; }
+/* each block owns a column, so its contents stack instead of competing for width */
+.console .metrics-vis .vis-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.console .metrics .vis-total { flex-direction: row; align-items: center; justify-content: space-between; min-width: 0; }
+.console .loc-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.console .loc-card { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name net" "split split"; align-items: baseline; column-gap: 10px; }
+.console .loc-name { grid-area: name; margin-bottom: 2px; }
+.console .loc-total { grid-area: net; justify-self: end; }
+.console .loc-split { grid-area: split; margin: 1px 0 2px; }
+.console .metrics-occ .occ-meta { max-width: 100%; }
+
+/* narrower panel: visitors and location pair up under occupancy, then everything stacks */
+@container consolebox (max-width: 1000px) {
+  .console .metrics { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: 0 9px; }
+}
+/* Compact three-column tier. A 4th camera puts the grid into 3 columns and the
+   console body down to ~520-550px; the three columns have to hold there, or
+   CAMERA LOCATION drops to a full-width row underneath. */
+@container consolebox (max-width: 620px) {
+  .console .metrics { grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr) minmax(0, 1.08fr); gap: 0 7px; }
+  .console .metrics .section-head .label { font-size: 12px; letter-spacing: .05em; }
+  .console .metrics .section-head .sub { font-size: 10.5px; }
+  .console .metrics .tile { padding: 2px 5px 3px; }
+  .console .metrics .vis-total { padding: 2px 6px 3px; }
+  .console .metrics-loc .loc-card { padding: 3px 5px 4px; }
+  .console .metrics-occ .occ-meta { font-size: 10.5px; }
+  /* ~176px per column: the icons carry male/female and adult/child on their own */
+  .console .metrics .tile .tag { display: none; }
+}
+/* below this three columns cannot hold a name plus four numbers */
+@container consolebox (max-width: 430px) {
+  .console .metrics { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 0 8px; }
+  .console .metrics-loc { grid-column: 1 / -1; margin-top: 4px; }
+  .console .loc-row { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+}
+@container consolebox (max-width: 340px) {
+  .console .metrics { grid-template-columns: minmax(0, 1fr); }
+  .console .metrics-loc { grid-column: auto; }
+}
+
+/* in the three narrow columns a heading must not be squeezed by its own caption */
+.console .metrics .section-head { flex-direction: column; align-items: flex-start; gap: 0; margin-bottom: 3px; }
+.console .metrics .section-head .label { white-space: nowrap; }
+.console .metrics .section-head .sub { font-size: 11.5px; line-height: 1.2; }
+
+/* =======================================================================
+   Type proportional to the box it sits in.
+   Each metric box is its own container, so `cqi` (1% of that box's width)
+   scales its numbers, labels and icons together instead of fixed pixels
+   that only fit one panel width. Clamps keep it readable at the extremes.
+   ======================================================================= */
+.console .metrics-occ,
+.console .metrics .vis-total,
+.console .metrics .tile,
+.console .metrics-loc .loc-card { container-type: inline-size; }
+
+/* occupancy column */
+.console .metrics-occ .occ-level { font-size: clamp(9px, 3.5cqi, 12px); padding: .25em .7em; }
+.console .metrics-occ .occ-meta,
+.console .metrics-occ .inout .k { font-size: clamp(8px, 3cqi, 11px); }
+.console .metrics-occ .inout .big { font-size: clamp(13px, 8.5cqi, 36px); }
+.console .metrics-occ .assumed-note { font-size: clamp(9px, 3.4cqi, 11px); }
+
+/* The net-visitors box. `cqi` on the box itself would resolve against the
+   console body, not the box, and sit pinned at the clamp ceiling - so the size
+   goes on the children, which do see .vis-total as their container. */
+.console .metrics .vis-total .vt-row { font-size: clamp(17px, 13.5cqi, 66px); }
+.console .metrics .vis-total .huge { font-size: 1em; }
+.console .metrics .vis-total .k { font-size: clamp(9px, 4.5cqi, 14px); letter-spacing: .05em; }
+.console .metrics .vis-total .ico.big { width: .72em; height: .72em; }
+
+/* gender / age tiles */
+.console .metrics .tile .tile-row { font-size: clamp(13px, 10.5cqi, 46px); }
+.console .metrics .tile .num { font-size: 1em; }
+.console .metrics .tile .tag { font-size: .27em; }
+.console .metrics .tile .tile-row .ico { width: .76em; height: .76em; }
+.console .metrics .tile .bar { height: clamp(4px, 1.8cqi, 8px); margin-top: .18em; }
+
+/* location cards */
+.console .metrics-loc .loc-card .loc-name { font-size: clamp(10px, 4cqi, 15px); }
+.console .metrics-loc .loc-card .loc-total { font-size: clamp(13px, 8.5cqi, 34px); }
+.console .metrics-loc .loc-card .loc-total b { font-size: 1em; }
+.console .metrics-loc .loc-card .loc-total .k { font-size: .37em; }
+.console .metrics-loc .loc-card .loc-split { font-size: clamp(10px, 4.6cqi, 18px); }
+.console .metrics-loc .loc-card .loc-split .ico { width: 1em; height: 1em; }
+/* the box label is a fixed phrase - let the number shrink before the label breaks */
+.console .metrics .vis-total .k { white-space: nowrap; letter-spacing: .03em; }
+.console .metrics .vis-total { gap: 8px; }
+.console .metrics-loc .loc-card .loc-total .k { white-space: nowrap; }
+
+/* --- console header at a narrow panel (last: container queries add no
+   specificity, so this must outrank the 19px title rule above) --- */
+/* Below ~1000 px the header is in deficit: the title is shrunk a fraction of a
+   pixel short of its text, which makes Chrome ellipsise a whole word. Dropping
+   the session id restores a surplus, so the site name renders in full. */
+@container consolepanel (max-width: 1000px) {
+  .console .session { display: none; }
+}
+/* below ~760 px even that is not enough - step the title down a size */
+@container consolepanel (max-width: 760px) {
+  .console .console-title { font-size: 16px; }
+}
+
+/* the per-area count moves onto the split row, now that the entered / left
+   line below it is gone (it restated numbers the card's NET already implies) */
+.console .metrics-loc .loc-card .loc-area {
+  font-family: var(--mono); color: var(--c-muted); white-space: nowrap;
+  font-size: .72em; align-self: center;
+}
+.console .metrics-loc .loc-card .loc-area.warn { color: var(--red); font-weight: 700; }
+.console .metrics-loc .loc-card .loc-split { flex-wrap: wrap; align-items: center; }
+
+
+/* the tiles hold the full column again, so the word tags fit and match the
+   visitors tiles beside them; they only come off in the compact tier below */
+.console .metrics-occ .tile .tile-row { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto; gap: 4px; }
+
+/* stacked layout: full width again, so the tags come back */
+@container consolebox (max-width: 430px) {
+  .console .metrics .tile .tag { display: inline; }
+}
+
+/* ============ occupancy column: the tiles are the figure now ============
+   The headline number, the percentage and the house icon were removed, so the
+   breakdown carries the occupancy on its own - sized a step
+   above the visitors tiles beside it, since it is the primary reading. */
+.console .metrics-occ .occ-tiles { display: grid; gap: 5px; min-width: 0; }
+/* a step above the visitors tiles (10.5cqi / 46px), but the ceiling has to stay
+   low: at the two-column breakpoint this column is far wider and a high cap
+   makes the row wrap onto two lines */
+.console .metrics-occ .tile .tile-row { font-size: clamp(14px, 11.5cqi, 34px); }
+.console .metrics-occ .occ-meta { margin-top: 6px; }
+
+/* the level badge rides with the heading instead of taking a row of its own */
+.console .metrics-occ .section-head { flex-direction: row; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* heading and badge share the first line; the caption drops below, as the
+   layout mock has it */
+.console .metrics-occ .section-head .sub { flex-basis: 100%; margin-top: 1px; }
+.console .metrics-occ .section-head .occ-level {
+  display: inline-block; margin: 0; padding: .2em .7em;
+  font-size: clamp(9px, 3.4cqi, 12px); line-height: 1.5;
+}
+
+/* ============ camera location: cards adapt to how many cameras there are ====
+   One card per stream, up to --max-cameras. Without this the column simply
+   grows and pushes the sections below off the panel. */
+.console .metrics-loc .loc-row { --loc-scale: 1; }
+.console .metrics-loc .loc-row[data-n="4"] { --loc-scale: .88; }
+.console .metrics-loc .loc-row[data-n="5"] { --loc-scale: .78; }
+.console .metrics-loc .loc-row[data-n="6"] { --loc-scale: .70; }
+.console .metrics-loc .loc-row[data-n="1"],
+.console .metrics-loc .loc-row[data-n="2"] { --loc-scale: 1.15; }
+.console .metrics-loc .loc-row { gap: calc(4px * var(--loc-scale)); }
+.console .metrics-loc .loc-card { padding: calc(4px * var(--loc-scale)) 7px calc(5px * var(--loc-scale)); }
+.console .metrics-loc .loc-card .loc-name { font-size: calc(clamp(10px, 4cqi, 15px) * var(--loc-scale)); }
+.console .metrics-loc .loc-card .loc-total { font-size: calc(clamp(13px, 8.5cqi, 34px) * var(--loc-scale)); }
+.console .metrics-loc .loc-card .loc-split { font-size: calc(clamp(10px, 4.6cqi, 18px) * var(--loc-scale)); }
+
+/* a dropped stream shows its state and nothing else */
+.console .metrics-loc .loc-card.offline { grid-template-areas: "name state"; align-items: center; }
+.console .metrics-loc .loc-card.offline .loc-name { color: var(--c-muted); }
+.console .metrics-loc .loc-offline {
+  grid-area: state; justify-self: end; color: var(--red); font-weight: 700;
+  letter-spacing: .08em; font-size: calc(clamp(11px, 5cqi, 19px) * var(--loc-scale));
+}
+
+/* the same box in the occupancy column, in its own colour: it shows who is
+   inside now (male + female, which by construction is the occupancy) */
+.console .metrics-occ .vis-total { background: #eaf3ec; border-color: var(--green); }
+.console .metrics-occ .vis-total .k { color: #17692f; }
+.console .metrics-occ .vis-total .huge { color: #14161a; }
+.console .metrics-occ .vis-total .ico.inside { color: #17692f; }
+.console .metrics-occ .occ-tiles { margin-top: 5px; }
+
+/* keyboard hint in the console footer - a shortcut nobody knows about is worth
+   little, and this one is for whoever is driving the demo, not just the author */
+.console .console-foot .keys { font-family: var(--mono); font-size: 12px; margin-right: 14px; white-space: nowrap; }
+.console .console-foot .keys b { color: var(--c-text); font-weight: 700; }
+@container consolepanel (max-width: 760px) { .console .console-foot .keys { display: none; } }

@@ -1,0 +1,13 @@
+{
+  "_comment": "Template. Copied to config/sources.json on first run; that file is gitignored because it holds site-specific camera URLs and credentials. --mode live uses 'live', --mode video uses 'video'. Edit the RTSP URLs for your site, or add cameras on the page.",
+  "live": [
+    "rtsp://admin:password@192.168.1.101:554/Streaming/Channels/101",
+    "rtsp://admin:password@192.168.1.102:554/Streaming/Channels/101",
+    "rtsp://admin:password@192.168.1.103:554/Streaming/Channels/101"
+  ],
+  "video": [
+    "sample_data/videos/cam1_store_entrance.mp4",
+    "sample_data/videos/cam2_street_corner.mp4",
+    "sample_data/videos/cam3_retail_shop.mp4"
+  ]
+}

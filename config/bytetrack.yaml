@@ -1,0 +1,15 @@
+# ByteTrack settings used by the demo (Ultralytics format).
+#
+# Tuned against sample_data/shop_interior01.mp4 (97s, ~10 people on screen at once).
+# The defaults fragmented that clip into 221 IDs with a median life of 27 frames and
+# 52% of tracks under a second: a single visitor became several short IDs, and every
+# new fragment is born on whichever side of the trigger line it appeared, so its entry
+# was never counted. The settings below give 57 IDs, median life 196 frames and 7%
+# under a second, at the same cost per frame.
+tracker_type: bytetrack
+track_high_thresh: 0.25
+track_low_thresh: 0.1
+new_track_thresh: 0.6    # was 0.3 - a weak detection now re-associates instead of spawning an ID
+track_buffer: 150        # was 60  - survive longer occlusions behind shelves and other visitors
+match_thresh: 0.85       # was 0.8 - slightly looser association across a missed frame
+fuse_score: True

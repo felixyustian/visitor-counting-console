@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "coordinates": "normalised 0..1 (x/width, y/height)",
+  "_comment": "Template. Copied to config/lines.json on first run; that file is gitignored because it is site-specific. Keys are matched on file name as well as full path, so these entries work from any clone location. Draw lines on the page (or with app.py) to replace them. An entry may also carry \"region\": [x1, y1, x2, y2] with \"region_role\" of count_inside (default), ignore_inside or classify_inside - drawn from the page with 'draw area'.",
+  "sources": {
+    "sample_data/videos/cam1_store_entrance.mp4": {
+      "p1": [
+        0.2,
+        0.64
+      ],
+      "p2": [
+        0.78,
+        0.64
+      ],
+      "entry_side": 1,
+      "name": "cam1_store_entrance"
+    },
+    "sample_data/videos/cam2_street_corner.mp4": {
+      "p1": [
+        0.52,
+        0.3
+      ],
+      "p2": [
+        0.52,
+        0.97
+      ],
+      "entry_side": -1,
+      "name": "cam2_street_corner"
+    },
+    "sample_data/videos/cam3_retail_shop.mp4": {
+      "p1": [
+        0.84,
+        0.58
+      ],
+      "p2": [
+        0.84,
+        0.99
+      ],
+      "entry_side": 1,
+      "name": "cam3_retail_shop"
+    }
+  }
+}
