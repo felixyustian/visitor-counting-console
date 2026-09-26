@@ -427,6 +427,18 @@ docs/                     screenshots used by this README
 Dockerfile / docker-compose.yml   CUDA container for the browser console
 ```
 
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+One thing to check before using this commercially: the detector is
+**Ultralytics YOLO11, which is AGPL-3.0**, not Apache. Running an AGPL component
+inside a network service you offer to others can oblige you to release that
+service's source under the AGPL, or to buy a commercial license from
+Ultralytics. The Apache license here covers *this* code, not its dependencies.
+Swapping the detector is a contained change — `humanmonitor/detector.py` is the
+only file that imports it.
+
 ## Known limits
 
 Worth stating plainly, because each of these is a place the numbers get worse:

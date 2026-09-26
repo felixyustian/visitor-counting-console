@@ -1,0 +1,31 @@
+Visitor Counting Console
+Copyright 2026 Felix Yustian Setiono
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+---
+
+This product bundles no third-party source. It depends at run time on
+packages listed in requirements.txt, each under its own license, and on two
+model weights downloaded at setup time:
+
+  ultralytics (YOLO11)      AGPL-3.0        https://github.com/ultralytics/ultralytics
+  ultralytics-thop          AGPL-3.0        https://github.com/ultralytics/thop
+  google/siglip2-base-patch16-256
+                            Apache-2.0      https://huggingface.co/google/siglip2-base-patch16-256
+
+Note that Ultralytics YOLO11 is AGPL-3.0. Using it in a network service that
+you distribute or offer to others may oblige you to release the source of that
+service under the AGPL, or to obtain a commercial license from Ultralytics.
+Swapping the detector is a contained change (see humanmonitor/detector.py) if
+that obligation is unwanted.
