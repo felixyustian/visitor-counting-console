@@ -1,14 +1,16 @@
 # Visitor Counting Console
 
-Count visitors entering a venue from existing CCTV feeds and break them down by
-gender (male / female) and age group (adult / child). Built for public venues
-with cameras already installed - an entrance counter that needs no new hardware,
-no turnstile and no app on anyone's phone.
+Counts people entering and leaving a venue from the CCTV that is already on the
+wall, and breaks the count down by gender and age group. No turnstile, no new
+hardware, no app on anyone's phone — a trigger line drawn on each camera's
+picture and a GPU.
 
-Up to **three feeds** (RTSP URLs or video files) are shown in a **2x2 grid**:
-three camera panels and one dashboard / crowd management panel - either as
-separate OpenCV windows (`app.py`) or in the browser (`webapp.py`, see
-*Browser console* below).
+![The console counting three feeds](docs/console.jpg)
+
+*Three clips running live: 13 visitors so far, 11 still inside, split by
+male/female and adult/child. Camera 1 has a counting area drawn over the shop
+floor, reporting `4 HERE 2M 2F 4A 0C` — who is standing in it right now, without
+waiting for anyone to cross the line.*
 
 ```
 CCTV feeds ──► YOLO11 person detection (one batched pass for all cameras)
@@ -17,6 +19,24 @@ CCTV feeds ──► YOLO11 person detection (one batched pass for all cameras)
            ──► SigLIP 2 zero-shot gender & adult/child, voted over the whole track
            ──► dashboard counters + output/events.csv
 ```
+
+Two front-ends over one engine: OpenCV windows for a kiosk (`app.py`), or a
+FastAPI browser console with MJPEG overlays and a ~4 Hz WebSocket state feed
+(`webapp.py`). Up to six cameras, added and removed on the page.
+
+### The decisions worth reading
+
+Counting people is easy to do badly and the failures are quiet, so most of the
+work here is in the parts that stop a plausible-looking number from being wrong.
+
+| | |
+| --- | --- |
+| **Gender and age are voted differently** | Gender takes the last 3 looks plus one at the moment of crossing counted double; age averages everything. The classifier's gender read swings early in a track and settles at the line, while "child" is noisy per frame and smooths out. **90.9% → 94.5%** and **96.4% → 100%** on 56 hand-labelled crossings against averaging everything ([details](#demographic-classifier)) |
+| **Visitors and occupancy are different numbers** | Someone who walks in and out has still visited, so visitors-today only rises while occupancy is net and falls again. Conflating them is the most common way a footfall dashboard misleads |
+| **The line counts 8% past each end** | So a line drawn a little short of a doorway still catches the edges — and the overlay *draws* that reach, because an invisible tolerance is indistinguishable from a bug when the numbers look off |
+| **A drawn area has a role** | *Count only inside*, *ignore inside*, or *classify only inside*. Restricting what is tracked and restricting what is classified are different needs; only the first constrains where the line may go, and the console warns when it is violated |
+| **Nothing is assumed** | The opening occupancy defaults to 0 rather than a guess, because a non-zero baseline has to be split 50/50 male/female by assumption and that guess would propagate into every demographic figure |
+| **Runtime config is not in git** | Every line dragged on a frame is written back to `config/`. Those files are gitignored and seeded from committed templates, so a deployment machine's own calibration never collides with a `git pull` |
 
 ## Quick start
 
@@ -188,7 +208,11 @@ it), and the **8 % of the segment length past each end that still counts** -
 shown as a faded dashed extension. A line saved within 4 % of the frame edge
 warns: people can cross it before the tracker has established them.
 
-**Counting areas.** *draw area* limits what a camera does to a rectangle. Pick
+**Counting areas.**
+
+![A counting area drawn over the shop floor](docs/counting-area.jpg)
+
+*draw area* limits what a camera does to a rectangle. Pick
 what the area is *for* from the dropdown beside the button, then drag a box
 across the picture (or click two opposite corners - drag when the box needs to
 reach an edge, since the button strip sits on the picture and only the start of
@@ -399,18 +423,25 @@ download_demo_videos.py   fetch the three demo clips
 export_tensorrt.py        YOLO -> TensorRT engine (NVIDIA)
 scripts/ab_demographics.py   accuracy evaluation on real crossings (see below)
 design/console_panel_v1.drawio   editable draw.io of the console panel layout
+docs/                     screenshots used by this README
 Dockerfile / docker-compose.yml   CUDA container for the browser console
 ```
 
-## Notes for the engineering assessment
+## Known limits
 
-* Counting is the most robust component; it needs the camera to see heads
-  cleanly across the line. Overhead / high-angle entrance cameras work best.
-* Zero-shot CLIP on full-body CCTV crops is a reasonable *demo* baseline for
-  gender and adult/child but will not match a purpose-trained attribute model.
-  The classifier is behind a one-method interface (`classify(crops)`) so it can
-  be swapped for a PA-100K/PETA attribute network or a face-based model where
-  faces are visible. Small / distant people (below `--min-crop-height`) are
-  counted but not classified until they get closer.
-* A single pipeline runs on all sites; the only per-site configuration is the
-  trigger line (and optionally `--conf` / `--min-crop-height`).
+Worth stating plainly, because each of these is a place the numbers get worse:
+
+* **Counting is the solid part; demographics are the weak part.** Counting needs
+  the camera to see heads cleanly across the line — overhead or high-angle
+  entrance cameras work best, a camera looking along a corridor is much harder.
+* **Zero-shot classification on full-body CCTV crops is a baseline, not a
+  product.** It will not match a purpose-trained attribute model. The classifier
+  sits behind a one-method interface (`classify(crops)`), so swapping in a
+  PA-100K / PETA attribute network, or a face-based model where faces are
+  actually visible, is a contained change.
+* **Small and distant people are counted but not classified** until they come
+  closer than `--min-crop-height`. They land in the unknown buckets rather than
+  being guessed at, which is why the splits always reconcile to the total.
+* **Per-site configuration is deliberately tiny**: the trigger line, and
+  optionally `--conf` / `--min-crop-height`. One pipeline runs everywhere, so
+  there is no per-site model to retrain or drift.
