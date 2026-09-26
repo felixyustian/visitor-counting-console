@@ -429,15 +429,16 @@ Dockerfile / docker-compose.yml   CUDA container for the browser console
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+MIT — see [LICENSE](LICENSE).
 
-One thing to check before using this commercially: the detector is
-**Ultralytics YOLO11, which is AGPL-3.0**, not Apache. Running an AGPL component
-inside a network service you offer to others can oblige you to release that
-service's source under the AGPL, or to buy a commercial license from
-Ultralytics. The Apache license here covers *this* code, not its dependencies.
-Swapping the detector is a contained change — `humanmonitor/detector.py` is the
-only file that imports it.
+**Read [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) before using this
+commercially.** MIT covers this code and reads as "do what you like", but the
+detector is **Ultralytics YOLO11, which is AGPL-3.0** — and this is a network
+service. An AGPL component inside a service you offer to others can oblige you
+to release that service's source under the AGPL, or to buy a commercial license
+from Ultralytics. A permissive license on your own code says nothing about what
+it imports. Swapping the detector is a contained change: `humanmonitor/detector.py`
+is the only file that touches it.
 
 ## Known limits
 
