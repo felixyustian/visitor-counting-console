@@ -298,6 +298,12 @@
     // collapse. Let it span two cells so it keeps a usable width while the
     // cameras share the rest.
     grid.classList.toggle("wide-console", cols >= 3);
+    // four or more cameras: the location cards pair up rather than stacking, or
+    // the column grows taller than the console tile and clips the other two
+    grid.classList.toggle("many-cams", cams.length >= 4);
+    // At five the grid turns 3x3 = 9 cells for 6 tiles, so a 2x2 console uses the
+    // slack instead of leaving a hole, and gets the height the alert list needs.
+    grid.classList.toggle("tall-console", cams.length >= 5);
     $("#btn-add-camera").disabled = state && cams.length >= state.max_cameras;
   }
 

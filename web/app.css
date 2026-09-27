@@ -47,6 +47,11 @@ code { font-family: var(--mono); font-size: .92em; color: #b8bcc4; }
 /* the console keeps two cells once the grid is 3+ wide, so its three metric
    columns still fit; declared before the expanded rules so those override it */
 .grid.wide-console > .panel.console { grid-column: span 2; }
+/* From five cameras the grid is three wide and three deep - nine cells for six
+   tiles - so the console can take a 2x2 block. It fills what would otherwise be
+   dead space in the last row, and doubles the console's height, which is what
+   the metric columns and the alert list actually need. */
+.grid.tall-console > .panel.console { grid-row: span 2; }
 .grid.has-expanded .panel { display: none; }
 .grid.has-expanded .panel.expanded { display: flex; grid-column: 1 / -1; grid-row: 1 / -1; }
 
@@ -769,6 +774,16 @@ label.check { color: #14161a; }
 .console .metrics-vis .vis-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .console .metrics .vis-total { flex-direction: row; align-items: center; justify-content: space-between; min-width: 0; }
 .console .loc-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+/* One card per row reads best up to three cameras. Beyond that the stack grows
+   taller than the console tile - which is a fixed fraction of the viewport - and
+   pushes the visitors and occupancy tiles out of view. From four cameras on, let
+   the cards pair up instead, so the column stays about as tall however many
+   there are. */
+.grid.many-cams .console .loc-row { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 5px; }
+.grid.many-cams .console .loc-name { font-size: 13px; }
+.grid.many-cams .console .loc-total b { font-size: 24px; }
+.grid.many-cams .console .loc-split { font-size: 14px; }
+.grid.many-cams .console .loc-split .ico { width: 15px; height: 15px; }
 .console .loc-card { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name net" "split split"; align-items: baseline; column-gap: 10px; }
 .console .loc-name { grid-area: name; margin-bottom: 2px; }
 .console .loc-total { grid-area: net; justify-self: end; }
