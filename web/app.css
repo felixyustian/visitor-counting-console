@@ -774,16 +774,6 @@ label.check { color: #14161a; }
 .console .metrics-vis .vis-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .console .metrics .vis-total { flex-direction: row; align-items: center; justify-content: space-between; min-width: 0; }
 .console .loc-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-/* One card per row reads best up to three cameras. Beyond that the stack grows
-   taller than the console tile - which is a fixed fraction of the viewport - and
-   pushes the visitors and occupancy tiles out of view. From four cameras on, let
-   the cards pair up instead, so the column stays about as tall however many
-   there are. */
-.grid.many-cams .console .loc-row { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 5px; }
-.grid.many-cams .console .loc-name { font-size: 13px; }
-.grid.many-cams .console .loc-total b { font-size: 24px; }
-.grid.many-cams .console .loc-split { font-size: 14px; }
-.grid.many-cams .console .loc-split .ico { width: 15px; height: 15px; }
 .console .loc-card { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name net" "split split"; align-items: baseline; column-gap: 10px; }
 .console .loc-name { grid-area: name; margin-bottom: 2px; }
 .console .loc-total { grid-area: net; justify-self: end; }
@@ -940,6 +930,26 @@ label.check { color: #14161a; }
 /* a dropped stream shows its state and nothing else */
 .console .metrics-loc .loc-card.offline { grid-template-areas: "name state"; align-items: center; }
 .console .metrics-loc .loc-card.offline .loc-name { color: var(--c-muted); }
+
+/* ============ CAMERAS DEPLOYED is a list, not a grid of tiles ============
+   One camera per row whatever the count, so every name, net and split is the
+   same size and reads at a glance. The list scrolls inside its own box rather
+   than growing the column: adding a sixth or seventh camera lengthens the list
+   instead of pushing ALERTS out of the console tile, which is what a stacked
+   layout did before. */
+.console .metrics-loc { min-height: 0; }
+.console .metrics-loc .loc-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  max-height: var(--loc-list-max, 318px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 3px;                 /* keeps the scrollbar off the card border */
+}
+/* the per-count shrink existed to fit more tiles in; a scrolling list does not
+   need it, and shrinking is the opposite of what makes the list readable */
+.console .metrics-loc .loc-row[data-n] { --loc-scale: 1; }
+
 .console .metrics-loc .loc-offline {
   grid-area: state; justify-self: end; color: var(--red); font-weight: 700;
   letter-spacing: .08em; font-size: calc(clamp(11px, 5cqi, 19px) * var(--loc-scale));
