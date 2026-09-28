@@ -419,7 +419,7 @@ config/                  *.json here are written by the app and gitignored;
 app.py           OpenCV-windows front-end          run_demo.sh / run_demo.bat
 webapp.py        browser front-end (FastAPI)       run_web.sh  / run_web.bat
 setup_ubuntu.sh / setup_windows.bat / setup_mac.sh   one-time environment set-up
-download_demo_videos.py   fetch the three demo clips
+download_demo_videos.py   fetch the five demo clips
 export_tensorrt.py        YOLO -> TensorRT engine (NVIDIA)
 scripts/ab_demographics.py   accuracy evaluation on real crossings (see below)
 design/console_panel_v1.drawio   editable draw.io of the console panel layout

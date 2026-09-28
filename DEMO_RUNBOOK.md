@@ -17,7 +17,7 @@ Two ways to feed it, on all three:
 | | when |
 | --- | --- |
 | **live** — the RTSP cameras | showing the real installation |
-| **video** — the saved clips | showing the features |
+| **video** — the five saved clips | showing the features |
 
 **Demonstrate on the clips, not on live cameras.** A camera pointed at a quiet
 corridor produces an empty frame, and an empty frame demonstrates nothing: the
@@ -46,7 +46,7 @@ The same three checks everywhere — only the path to the interpreter differs:
 cd ~/Documents/cv-demo-humanmonitor        # macOS: wherever the clone is
 git fetch origin
 git status -sb                # want: "## main...origin/main" and nothing else
-ls -lh sample_data/videos/    # three clips, tens of MB each
+ls -lh sample_data/videos/    # five clips, ~110 MB total
 ```
 
 **Windows**

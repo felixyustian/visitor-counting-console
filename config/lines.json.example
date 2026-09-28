@@ -38,6 +38,30 @@
       ],
       "entry_side": 1,
       "name": "cam3_retail_shop"
+    },
+    "sample_data/videos/cam4_mall_doors.mp4": {
+      "p1": [
+        0.12,
+        0.66
+      ],
+      "p2": [
+        0.88,
+        0.66
+      ],
+      "entry_side": 1,
+      "name": "Mall doors"
+    },
+    "sample_data/videos/cam5_street_frontage.mp4": {
+      "p1": [
+        0.62,
+        0.06
+      ],
+      "p2": [
+        0.68,
+        0.44
+      ],
+      "entry_side": 1,
+      "name": "Roadside"
     }
   }
 }

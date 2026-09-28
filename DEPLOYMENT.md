@@ -335,7 +335,7 @@ config\sources.json`) and edit the URLs.
 
 ### 6.2 Trigger lines and counting areas – `config/lines.json`
 
-Not in git: written the first time a line is saved. Until then the three demo
+Not in git: written the first time a line is saved. Until then the five demo
 clips' starting lines are read from `config/lines.json.example`.
 
 One line per camera across the entrance; a person is counted when their head
