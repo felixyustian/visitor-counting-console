@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+from urllib.parse import quote
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Optional
@@ -23,6 +25,83 @@ def template_of(path: Path | str) -> Path:
 def is_url(src: str) -> bool:
     s = src.lower()
     return s.startswith(("rtsp://", "rtsps://", "http://", "https://", "rtmp://", "udp://", "tcp://"))
+
+
+_PCT_ESCAPE = re.compile(r"%[0-9A-Fa-f]{2}")
+
+
+def _encode_userinfo(part: str) -> str:
+    """Percent-encode one credential field, leaving any existing %XX escapes alone.
+
+    Re-encoding an already-encoded password would turn `%24` into `%2524`, so the
+    parts that are already escapes are stepped over rather than quoted again.
+    """
+    out, i = [], 0
+    for m in _PCT_ESCAPE.finditer(part):
+        out.append(quote(part[i:m.start()], safe=""))
+        out.append(m.group(0))
+        i = m.end()
+    out.append(quote(part[i:], safe=""))
+    return "".join(out)
+
+
+def encode_url_credentials(src: str) -> str:
+    """Percent-encode the user and password of a stream URL, if it has any.
+
+    Camera passwords routinely contain characters that are structural in a URL.
+    `@` separates the credentials from the host and `:` separates user from
+    password, so `rtsp://admin:pa@ss@host/path` cannot be handed to FFmpeg as
+    typed - and `$`, `%` and spaces are no better. Operators should not have to
+    know that: they paste what the camera's own web page shows them, and this
+    makes it a valid URL on the way out.
+
+    The split is the one RFC 3986 specifies: the credentials end at the LAST `@`
+    of the authority and the user ends at the FIRST `:`, so a password may itself
+    contain `@` or `:` and still comes out right.
+
+    `/`, `?` and `#` in a password cannot be fixed here, and this deliberately
+    does not try: they end the authority, so `rtsp://a/b@c` is indistinguishable
+    from host `a` with path `/b@c`, which is the reading RFC 3986 requires. Those
+    three have to be percent-encoded by hand - see `unencodable_password`, which
+    spots the case so the operator is told rather than left guessing.
+    """
+    if not is_url(src):
+        return src
+    scheme, sep, rest = src.partition("://")
+    if not sep:
+        return src
+    m = re.search(r"[/?#]", rest)              # the authority ends at the path/query/fragment
+    authority, tail = (rest[:m.start()], rest[m.start():]) if m else (rest, "")
+    if "@" not in authority:
+        return src
+    userinfo, _, hostport = authority.rpartition("@")
+    user, colon, password = userinfo.partition(":")
+    cred = _encode_userinfo(user)
+    if colon:
+        cred += ":" + _encode_userinfo(password)
+    return f"{scheme}://{cred}@{hostport}{tail}"
+
+
+def unencodable_password(src: str) -> bool:
+    """True when a URL looks like it has an unencoded `/`, `?` or `#` in the password.
+
+    The tell is an authority that carries a `:` but no `@`, while an `@` appears
+    later in the string: the path separator has cut the credentials in half.
+    """
+    if not is_url(src):
+        return False
+    _, sep, rest = src.partition("://")
+    if not sep:
+        return False
+    m = re.search(r"[/?#]", rest)
+    if not m:
+        return False
+    authority, tail = rest[:m.start()], rest[m.start():]
+    if "@" in authority or "@" not in tail:
+        return False
+    # A `:` in the authority is a port on a normal URL, so strip one before
+    # deciding: `192.168.0.61:554` with an `@` later is a path, not a password.
+    return ":" in re.sub(r":\d+$", "", authority)
 
 
 def source_key(src: str) -> str:

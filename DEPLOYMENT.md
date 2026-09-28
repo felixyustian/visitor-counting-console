@@ -317,9 +317,21 @@ config\sources.json`) and edit the URLs.
 }
 ```
 
-* Max **3** entries per set; an entry is a plain string or `{"src": "...", "name": "Main entrance"}` for a display name. `--sources a b c` on the command line overrides the file (files and URLs can be mixed).
+* Up to `--max-cameras` entries per set (**6** by default; the shipped template lists five); an entry is a plain string or `{"src": "...", "name": "Main entrance"}` for a display name. `--sources a b c` on the command line overrides the file (files and URLs can be mixed).
 * The list may be empty: cameras added on the page (⚙ on a panel / **+ add camera**) are written back here under the mode the server was started with, so they survive a restart. Empty slots are dropped when saving, so cameras move up to the first free slots.
-* URL-encode special characters in passwords (`@` → `%40`, `#` → `%23`, `/` → `%2F`).
+* **Passwords with special characters go in as they are.** `@`, `:`, `$`, `%`,
+  `&`, spaces and the rest are percent-encoded for you on the way to FFmpeg, so
+  paste exactly what the camera's own page shows. The stored config keeps what
+  you typed, so the ⚙ form shows it back unchanged.
+  Three characters cannot be handled automatically and must be encoded by hand:
+  **`/` → `%2F`, `?` → `%3F`, `#` → `%23`**. They end the URL's authority, which
+  makes `rtsp://a/b@c` genuinely ambiguous - RFC 3986 reads it as host `a` with
+  path `/b@c`, and no amount of guessing can tell the two apart. The page rejects
+  such a URL with that message rather than failing to connect for unclear reasons.
+* **Watch the shell**, not just the app. `$$` in a double-quoted or unquoted
+  command-line argument is the shell's process id, so
+  `--sources "rtsp://admin:Pa$$w0rd@..."` sends a different password every run.
+  Use single quotes, or add the camera on the page instead.
 * Typical URL formats (sub-stream = lower resolution, recommended when the GPU is small):
 
   | vendor | main stream | sub stream |
@@ -490,7 +502,7 @@ Reference: RTX 3060 Ti, three 1080p files, defaults → ~11–14 fps (README *Pe
 | --- | --- |
 | `CUDA available: False` after set-up | driver too old for the wheels → `CUDA_INDEX=cu126 ./setup_ubuntu.sh` (or `set CUDA_INDEX=cu126`), reboot after driver install; `nvidia-smi` must work first |
 | `torch ... not compiled with CUDA` / `device=cpu` on an NVIDIA box | venv was created with the CPU wheels → delete `.venv` and re-run the set-up script |
-| `OFFLINE (cannot open)` for a camera | wrong URL/credentials, camera blocks a 4th client, or UDP-only camera → test with `ffplay -rtsp_transport tcp`, URL-encode the password, use the sub-stream |
+| `OFFLINE (cannot open)` for a camera | wrong URL/credentials, camera blocks a 4th client, or UDP-only camera → test with `ffplay -rtsp_transport tcp` (single-quote the URL so the shell does not eat a `$`), or use the sub-stream |
 | stream connects then drops every few seconds | network MTU/packet loss on Wi-Fi → wired LAN, sub-stream, check camera "max connections" |
 | `libGL.so.1: cannot open shared object` (Ubuntu) | `sudo apt install libgl1 libglib2.0-0` (the set-up script does this) |
 | `Address already in use` | another instance running → `pkill -f webapp.py` / Task Manager, or `--port 8781` |

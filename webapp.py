@@ -37,7 +37,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import add_engine_args, check_sources
-from humanmonitor.config import ROLES, ROLE_COUNT_INSIDE, Region, is_url, template_of
+from humanmonitor.config import (ROLES, ROLE_COUNT_INSIDE, Region, is_url,
+                                 template_of, unencodable_password)
 from humanmonitor.engine import PRESENT_ZERO, Camera, Engine, EngineConfig, EventRecord
 from humanmonitor.history import FrameStore, HistoryLog, Recorder, Scheduler
 from humanmonitor.site import SiteConfig
@@ -88,8 +89,8 @@ def save_sources(mode: str, path: Path, entries: list) -> None:
 # a track is seeded from the side it is first seen on (humanmonitor/counter.py),
 # so a person who first appears already past the line is seeded on the wrong side
 # and their next step registers a crossing that did not happen. That is what a
-# line drawn hard against the frame edge causes, and it has been seen happening
-# on a real entrance camera. Warn, do not block: an
+# line drawn hard against the frame edge causes - seen live on 23 Sep (03:54:
+# "never detected yet, then you already [counted]"). Warn, do not block: an
 # entrance really can sit at the edge of the view.
 EDGE_MARGIN = 0.04          # fraction of the frame; ~50 px on a 1280-wide stream
 
@@ -571,6 +572,15 @@ def build_app(engine: Engine, console: Console, frames: FrameStore, should_stop=
             raise HTTPException(400, "src (RTSP/HTTP URL or a video file path on the server) is required")
         if not is_url(src) and not Path(src).exists():
             raise HTTPException(400, f"video file not found on the server: {src}")
+        if unencodable_password(src):
+            # A `/`, `?` or `#` in the password ends the authority, so the URL is
+            # genuinely ambiguous - `rtsp://a/b@c` is host `a` with path `/b@c` as
+            # far as RFC 3986 is concerned. Everything else we encode silently.
+            raise HTTPException(400,
+                "the password appears to contain / ? or # - those cannot be worked out "
+                "from the URL and must be percent-encoded by hand: / becomes %2F, "
+                "? becomes %3F, # becomes %23. Other characters, including @ : $ % "
+                "and spaces, can be pasted as they are.")
         if any(c is not cam and not c.source.is_null and c.source.src == src for c in engine.cameras):
             raise HTTPException(409, "that source is already assigned to another camera")
         if not cam.source.is_null and cam.source.src == src:

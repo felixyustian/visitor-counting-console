@@ -33,7 +33,7 @@ READ_TIMEOUT_MS = 5000
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 
-from .config import is_url, source_name  # noqa: E402
+from .config import encode_url_credentials, is_url, source_name  # noqa: E402
 
 
 @dataclass
@@ -118,12 +118,17 @@ class VideoSource:
     def _open(self) -> bool:
         if self._cap is not None:
             self._cap.release()
+        # FFmpeg needs a structurally valid URL: a password holding `@`, `:`, `$`,
+        # `%` or a space has to be percent-encoded or the authority parses wrong.
+        # self.src stays exactly as the operator typed it, so the source form
+        # shows them back what they entered.
+        url = encode_url_credentials(self.src) if self.is_stream else self.src
         try:
-            cap = cv2.VideoCapture(self.src, cv2.CAP_FFMPEG,
+            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG,
                                    [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, OPEN_TIMEOUT_MS,
                                     cv2.CAP_PROP_READ_TIMEOUT_MSEC, READ_TIMEOUT_MS])
         except (AttributeError, TypeError):        # older OpenCV without the params overload
-            cap = cv2.VideoCapture(self.src, cv2.CAP_FFMPEG)
+            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
         if not cap.isOpened():
             self.connected = False
             self.last_error = "cannot open"
