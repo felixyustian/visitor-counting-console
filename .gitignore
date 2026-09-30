@@ -69,3 +69,8 @@ config/sources.json
 
 # Office lock files - created when a .docx/.pptx in docs/ is opened for review
 ~$*
+
+# ACCEL / TRMS integration material - belongs to the other project and must not
+# reach this public repository. Ignored here so a broad `git add` cannot sweep
+# it in if the folder is ever copied across.
+cv-counting-icd-proposal/
