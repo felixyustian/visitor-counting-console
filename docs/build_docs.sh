@@ -14,6 +14,8 @@ cd "$(dirname "$0")/.."
 OUT="${1:-docs}"
 mkdir -p "$OUT"
 
+# Images in the slides are written relative to docs/, so pandoc is pointed there.
+
 # A handful of glyphs the default LaTeX font cannot draw. DOCX and PPTX carry
 # them fine, so this substitution is applied on the PDF path only, and to a
 # temporary copy - the markdown sources keep the symbols.
@@ -35,12 +37,13 @@ pandoc /tmp/_specs.md -o "$OUT/Visitor-Counting-Console-Features-and-Specs.pdf" 
 say "Features-and-Specs.pdf" "ok"
 
 # ---- deck: PPTX + PDF ----
-pandoc docs/slides.md -o "$OUT/Visitor-Counting-Console-Deck.pptx" --slide-level=1
+pandoc docs/slides.md -o "$OUT/Visitor-Counting-Console-Deck.pptx" --slide-level=1 \
+    --resource-path=docs
 say "Deck.pptx" "ok"
 
 pdf_safe docs/slides.md > /tmp/_slides.md
 pandoc /tmp/_slides.md -o "$OUT/Visitor-Counting-Console-Deck.pdf" \
-    -t beamer --slide-level=1 --pdf-engine=tectonic \
+    -t beamer --slide-level=1 --pdf-engine=tectonic --resource-path=docs \
     -V theme:default -V colortheme:seahorse -V fontsize:11pt
 say "Deck.pdf" "ok"
 

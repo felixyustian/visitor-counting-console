@@ -5,115 +5,122 @@ date: "30 September 2026"
 lang: en-GB
 ---
 
-# What it is
+# Visitor counting on the CCTV a venue already has
 
-Visitor counting on the CCTV a venue already has.
+![](figures/01_console.jpg){width=88%}
 
-- A trigger line drawn across each entrance
-- A person is counted when their **head point** crosses it
-- Zero-shot classification gives **male / female** and **adult / child**
-- No turnstile, no new hardware, no app
+Five entrances, one site. No turnstile, no new hardware, no app.
 
-One machine with a GPU runs everything. No database, no cloud, no per-site
-training.
+# What the operator sees
 
-# How it works
+![](figures/02_panel.png){width=92%}
 
-```
-RTSP / HTTP / file
-  -> threaded decode, one thread per source
-  -> YOLO11 detection, one batched pass for all cameras
-  -> ByteTrack, one tracker per camera
-  -> head point crosses the line -> entry (+1) / exit (-1)
-  -> SigLIP 2 gender and adult/child on selected crops
-  -> counters, alerts, CSV logs
-  -> MJPEG overlays + JSON state over WebSocket
-```
+Visitors today, current occupancy and every camera, side by side.
 
 # Two figures, deliberately different
 
+![](figures/04_two_figures.png){width=62%}
+
 - **Visitors today** counts entries only and never falls
-- **Current occupancy** is net and falls again when people leave
+- **Current occupancy** is net, and falls again when people leave
 
-Someone who walks in and out has still visited.
+Someone who walks in and out has still visited. Conflating the two is the most
+common way a footfall dashboard misleads.
 
-Conflating the two is the most common way a footfall dashboard misleads.
+# How it works
 
-# Counting: the parts that stop a wrong number looking right
+![](figures/fig_pipeline.png){width=100%}
 
-- **8 % tolerance** past each end of the line — and it is *drawn*, because an
-  invisible tolerance is indistinguishable from a bug
-- **4 % edge warning** — a line too near the frame edge fires before the tracker
-  has established the person
-- **Hysteresis + multi-frame confirmation** absorb detector jitter
-- **One event per side transition per track**; a new track at the same spot is
-  treated as an ID switch and ignored
+# A trigger line, and what it really covers
+
+![](figures/05_trigger_line.jpg){width=72%}
+
+The dashed extension past each end is the **8 % that still counts**. It is drawn,
+because an invisible tolerance is indistinguishable from a bug when the numbers
+look wrong. A line saved within 4 % of the frame edge warns.
 
 # Demographics: two attributes, two strategies
 
-- **Gender** — last three looks plus one at the moment of crossing, counted
+- **Gender** — the last three looks plus one at the moment of crossing, counted
   double. The read swings early in a track and settles at the line.
-- **Age** — averages every observation. "Child" is noisy per frame and smooths
-  out.
+- **Age** — averages every observation. "Child" is noisy per frame and smooths out.
 
 Measured on 56 hand-labelled crossings:
 
-| attribute | averaging | split strategy |
+| attribute | averaging everything | split strategy |
 | --- | --- | --- |
 | gender | 90.9 % | **94.5 %** |
 | adult / child | 96.4 % | **100 %** |
 
-# Counting areas have a role
+Undecided people are reported as **unknown**, never guessed, so the splits
+always reconcile to the total.
 
-Restricting what is **tracked** and what is **classified** are different needs.
+# Counting areas have a role: count only inside
 
-| role | effect |
-| --- | --- |
-| count only inside | only people inside are tracked at all |
-| ignore inside | people inside are skipped: a window, a mirror, a poster |
-| classify only inside | everyone counted, only those inside sexed and aged |
+![](figures/06_area_count.jpg){width=66%}
 
-Only the first constrains where the line may go — and the console says so when
-it is violated.
+Only people inside the box are tracked at all — outside is dimmed, and the
+people there carry no boxes. The area reports its own population: `2 HERE
+1M 1F 2A 0C`.
 
-# An area reports its own population
+# Ignore inside
 
-Who is standing in it **right now**, split male/female and adult/child.
+![](figures/07_area_ignore.jpg){width=66%}
 
-- Owes nothing to the trigger line
-- Reads correctly from the first frame rather than starting at zero
-- Undecided people are reported as unknown, so the parts always sum to the total
+The mirror image: people inside the box are skipped entirely. For a window, a
+mirror, a poster or a screen that the detector would otherwise count.
 
-*Classify only inside* is the accuracy lever on a wide scene: spend the crop
-budget where people are large and clear.
+# Classify only inside
+
+![](figures/08_area_classify.jpg){width=66%}
+
+Everyone is still counted; only those inside are sexed and aged. The accuracy
+lever on a wide scene — spend the crop budget where people are large and clear,
+instead of on distant figures.
+
+# Why the role matters
+
+Restricting what is **tracked** and restricting what is **classified** are
+different needs.
+
+| role | tracking | classifying | line may sit outside? |
+| --- | --- | --- | --- |
+| count only inside | inside only | inside only | **no** — saving warns |
+| ignore inside | outside only | everyone tracked | yes |
+| classify only inside | everyone | inside only | yes |
+
+*Count only inside* must contain the whole trigger line: a person is only
+tracked once inside the box, so one approaching from outside is first seen
+already at the line. The console says so rather than quietly counting nothing.
 
 # Cameras
 
-- Up to **six**, added and removed while running; the grid re-lays itself out
-- RTSP, HTTP or a video file per camera
-- Passwords with `@ : $ % &` or spaces are encoded automatically
-- **Paired feeds**: one key swaps a panel between its live camera and a saved
-  clip
-- An unreachable camera reports `OFFLINE` and **hides its figures** rather than
-  showing frozen ones
+![](figures/03_camera_list.png){width=52%}
+
+- Up to **six**, added and removed while running
+- One row per camera, whatever the count; the list scrolls on its own
+- Paired feeds: one key swaps a panel between its live camera and a saved clip
+- An offline camera **hides its figures** rather than showing frozen ones
 
 # Capacity, alerts, evidence
 
-- Site capacity with a warning threshold; the banner **names the entrance** that
-  tipped the count
-- Per-area capacity, alarming independently
-- One button records 10 s before and 20 s after, with a note
-- Over capacity records a clip automatically
-- Every crossing is logged with the probabilities behind the decision
+![](figures/09_alarm.png){width=88%}
 
-# Interfaces
+The banner names the entrance that tipped the count, a clip is recorded
+automatically, and any entrance can carry its own limit.
+
+# Interfaces and data
 
 - **24 HTTP and WebSocket endpoints** — state, history, cameras, lines, areas,
   capacity, recording
 - **MJPEG** overlay stream per camera, encoded once and shared between viewers
 - **JSON state** pushed over WebSocket at about 4 Hz
-- `output/events.csv` — one row per crossing
-- `output/history.csv` — hourly, closing, corrections, events
+
+`events.csv` — one row per crossing, with the probabilities and observation
+count behind the decision, so any number can be audited back to the frames that
+produced it.
+
+`history.csv` — hourly rows, closing totals, corrections, recorded events.
 
 # Configuration stays on the machine
 
@@ -143,18 +150,18 @@ across cameras.
 # Known limits
 
 - **Counting is the robust part.** It needs the camera to see heads cleanly
-  across the line — overhead or high-angle works best.
+  across the line — overhead or high-angle works best, along a corridor is much
+  harder.
 - **Zero-shot classification is a baseline**, not a purpose-trained attribute
-  model.
-- **Distant people are counted but not classified**, and are reported as unknown
-  rather than guessed.
+  model, and will not match one.
+- **Distant people are counted but not classified**, and are reported as unknown.
 - **The detector is AGPL-3.0.** Offering this as a network service may oblige
   disclosure or a commercial licence. One file imports it.
 
 # Summary
 
-- Runs on existing CCTV, one machine, no cloud
-- Two figures that mean different things, and never conflated
-- Accuracy work is measured, not asserted
-- Unknowns are reported, not guessed
-- Every number auditable back to the frames that produced it
+- Runs on existing CCTV, one machine, no cloud, no per-site training
+- Two figures that mean different things, and are never conflated
+- Accuracy work is **measured**, not asserted
+- Unknowns are **reported**, not guessed
+- Every number is auditable back to the frames that produced it
