@@ -166,10 +166,18 @@ display and every change goes through one form. Corrections are logged as
 **Per-entrance cards.** The CAMERAS DEPLOYED column gives every camera a card
 carrying the net for that entrance and its splits, so a headline number can
 always be read back to the doors it came from. Clicking a card focuses the
-whole panel on that camera (click again for the whole site). The card sizes
-itself to the number of cameras, and a camera that drops off **hides its
-numbers and shows `OFFLINE`** instead - the figures it had were frozen at the
-moment the link dropped, and showing them would imply they were still live. The
+whole panel on that camera (click again for the whole site).
+
+**One camera per row, whatever the count.** Every name, net and split is the same
+size however many cameras there are, so the column scans top to bottom. The list
+scrolls inside its own fixed-height box rather than growing: adding a sixth or
+seventh camera lengthens the list instead of pushing the alerts off the panel.
+An earlier version paired the cards into two columns past four cameras, which
+shrank the text and turned the column into a grid of small tiles.
+
+A camera that drops off **hides its numbers and shows `OFFLINE`** instead - the
+figures it had were frozen at the moment the link dropped, and showing them
+would imply they were still live. The
 same numbers are drawn into each camera frame, bottom right, so a recorded clip
 carries them.
 
@@ -188,6 +196,15 @@ capacity; *connect* swaps the feed at run time and saves it to
 camera* empties the slot, *remove panel* deletes it, **+ camera** in the
 console header adds one (up to `--max-cameras`). Credentials are masked in the
 UI afterwards.
+
+**Passwords go in as typed.** `@`, `:`, `$`, `%`, `&` and spaces are structural
+in a URL, and are percent-encoded for you on the way to FFmpeg - paste whatever
+the camera's own page shows. `/`, `?` and `#` are the exception and must be
+encoded by hand (`%2F`, `%3F`, `%23`): they end the URL's authority, so
+`rtsp://a/b@c` is indistinguishable from host `a` with path `/b@c`. The form
+says so rather than failing to connect for unclear reasons. Note this is about
+the *page*: on a command line, `$$` is the shell's process id, so single-quote
+any URL you pass with `--sources`.
 
 **Swapping a panel between its video file and its live feed.** Give
 `config/sources.json` a `live` and a `video` list of the same length and slot
@@ -223,6 +240,9 @@ a drag has to miss it):
 | **count only inside** | only people inside are tracked at all; outside is dimmed | **no** - saving warns |
 | **ignore inside** | people inside are skipped - a window, a mirror, a poster | yes |
 | **classify only inside** | everyone is counted, but only those inside are sexed and aged | yes |
+
+A box must be at least **5 % of the frame** on each side; smaller is refused as
+a stray click.
 
 *count only inside* must contain the whole line with room on both sides: a
 person is only tracked once inside the box, so one approaching from outside is

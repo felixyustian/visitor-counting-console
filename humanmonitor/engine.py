@@ -108,7 +108,7 @@ class Camera:
 
     @property
     def name(self) -> str:
-        """Display name. An RTSP URL makes a poor label - `192.168.0.62:554/
+        """Display name. An RTSP URL makes a poor label - `192.168.1.62:554/
         Streaming/Channels/101` is what BY LOCATION was showing - so a live feed
         with no label falls back to its slot number instead - an operator wants
         "Camera 2", not an address. A file keeps its stem, which already reads well."""

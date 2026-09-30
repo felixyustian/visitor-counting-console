@@ -386,6 +386,9 @@ is one of:
 | `ignore_inside` | people inside are skipped – a window, a mirror, a poster |
 | `classify_inside` | everyone is counted; only those inside are sexed and aged |
 
+A box must be at least **5 % of the frame** on each side; anything smaller is
+refused as a stray click.
+
 `count_inside` **must contain the whole trigger line**, with room on both sides
 for people to be picked up before they reach it: a person is only tracked once
 inside the box, so one approaching from outside is first seen already at the

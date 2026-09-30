@@ -100,7 +100,7 @@ def unencodable_password(src: str) -> bool:
     if "@" in authority or "@" not in tail:
         return False
     # A `:` in the authority is a port on a normal URL, so strip one before
-    # deciding: `192.168.0.61:554` with an `@` later is a path, not a password.
+    # deciding: `192.168.1.61:554` with an `@` later is a path, not a password.
     return ":" in re.sub(r":\d+$", "", authority)
 
 

@@ -166,7 +166,9 @@ asks once per day.
 ## 3. What to show, in order
 
 1. **The panel in one view** — `VISITORS TODAY`, `CURRENT OCCUPANCY`,
-   `CAMERAS DEPLOYED` side by side, no scrolling.
+   `CAMERAS DEPLOYED` side by side. Every camera gets its own row in the
+   third column; past five the list scrolls on its own rather than pushing
+   anything else off the panel.
 2. **The two figures are different things** — visitors today counts everyone who
    entered; current occupancy is who is inside now. Each box sums to the two
    tiles beneath it.
@@ -200,7 +202,9 @@ asks once per day.
    *classify only inside* is the one to demonstrate for accuracy: put it where
    people are large and well lit, and the crop budget stops being spent on
    distant figures. Tracks outside it still count, they just read `??`.
-   *clear area* puts the whole frame back.
+   *clear area* puts the whole frame back. A box has to be at least **5 % of the
+frame** on each side; smaller than that is refused, since it is more likely a
+stray click than an area anyone meant to draw.
 
    While a box is being drawn the buttons that do not belong to that flow —
    *flip IN*, *clear*, *delete line*, the feed swap and *record* — grey out on
@@ -241,6 +245,7 @@ asks once per day.
 | a camera counts nothing after an area was drawn | the area is *count only inside* and the trigger line is not inside it — people are first seen already at the line. Either enlarge the area to cover the whole line with room on both sides, or switch the role to *classify only inside*. Saving it warns about this |
 | counts negative, or `0 inside` with a note | the clips start mid-scene, so people leave through lines they were never seen entering. **reset counters** in the footer, or set a starting occupancy on the set-up screen |
 | `v` does nothing, toast says no paired feed | that slot has no counterpart. `config/sources.json` needs `live` and `video` lists of the same length — slot *i* pairs with the other list's entry *i* |
+| a camera added on the page will not connect, and the password has symbols in it | `@ : $ % &` and spaces are encoded for you - paste them as they are. `/ ? #` must be typed as `%2F %3F %23`. If you passed the URL on a command line instead, single-quote it: `$$` unquoted is the shell's process id |
 | cameras read `Camera 1 / 2 / 3` | no display names set. ⚙ on a panel, type a name, connect. It persists |
 | `git pull` refused | see §1 |
 | `pipeline fps` in low single figures | expected on macOS (no CUDA) — see the note at the top. On Ubuntu or Windows it means the GPU is not being used: check the log's first lines for `CUDA available: True` |
