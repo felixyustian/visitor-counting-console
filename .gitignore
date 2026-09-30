@@ -66,3 +66,6 @@ __pycache__/
 config/site.json
 config/lines.json
 config/sources.json
+
+# Office lock files - created when a .docx/.pptx in docs/ is opened for review
+~$*
