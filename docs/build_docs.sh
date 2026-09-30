@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the distributable documents from the markdown sources.
 #
-#   ./docs/build_docs.sh [outdir]        default outdir: ../  (beside the repo)
+#   ./docs/build_docs.sh [outdir]        default outdir: docs/
 #
 # Produces:
 #   Visitor-Counting-Console-Features-and-Specs.docx / .pdf
@@ -11,7 +11,7 @@
 # Needs pandoc, and tectonic for the PDFs (brew install pandoc tectonic).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-OUT="${1:-..}"
+OUT="${1:-docs}"
 mkdir -p "$OUT"
 
 # A handful of glyphs the default LaTeX font cannot draw. DOCX and PPTX carry
