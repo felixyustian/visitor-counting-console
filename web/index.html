@@ -84,6 +84,15 @@
               <div class="tile-row"><span class="tag adult">ADULT</span><svg class="ico adult" role="img" aria-label="adult"><title>adult</title><use href="#i-adult"/></svg><span class="num adult" id="v-adult">0</span><span class="num child" id="v-child">0</span><svg class="ico child" role="img" aria-label="child"><title>child</title><use href="#i-child"/></svg><span class="tag child">CHILD</span></div>
               <div class="bar"><i class="adult" id="vbar-adult"></i><i class="child" id="vbar-child"></i></div>
             </div>
+            <div class="tile cmio-tile hidden" id="cmio-tile" title="CMIO from the trained classifier - provisional, not yet validated against labelled crops">
+              <div class="cmio-row">
+                <span class="cmio-k">CMIO <em>provisional</em></span>
+                <span class="cn">CN <b id="v-cn">0</b></span><span class="my">MY <b id="v-my">0</b></span>
+                <span class="in">IN <b id="v-in">0</b></span><span class="ot">OT <b id="v-ot">0</b></span>
+                <span class="unk">? <b id="v-run">0</b></span>
+              </div>
+              <div class="bar"><i class="cn" id="vbar-cn"></i><i class="my" id="vbar-my"></i><i class="in" id="vbar-in"></i><i class="ot" id="vbar-ot"></i></div>
+            </div>
           </div>
         </div>
         <div class="metrics-occ">
@@ -127,7 +136,7 @@
       <div class="section">
         <div class="section-head"><span class="label">EVENTS</span><span class="sub" id="events-sub">latest crossings</span></div>
         <table class="tbl" id="events">
-          <thead><tr><th>time</th><th>camera</th><th>event</th><th>gender</th><th>age</th><th>track</th></tr></thead>
+          <thead><tr><th>time</th><th>camera</th><th>event</th><th>gender</th><th>age</th><th class="cmio-col hidden">CMIO</th><th>track</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>

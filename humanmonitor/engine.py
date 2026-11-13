@@ -20,13 +20,17 @@ import numpy as np
 
 from .classifier import DEFAULT_MODEL as DEFAULT_CLASSIFIER, DemographicClassifier, crop_person
 from .config import LineConfigStore, Region, TriggerLine, is_url
-from .counter import CROSSING_WEIGHT, CrossEvent, LineCounter, Revision, UNKNOWN
+from .counter import CROSSING_WEIGHT, RACE_AGREE, CrossEvent, LineCounter, Revision, UNKNOWN
 from .detector import MultiStreamPersonTracker, Track
 from .sources import Frame, NullSource, VideoSource
-from .stats import EventLog, Stats, TrackLog
+from .stats import RACE_FIELD, EventLog, Stats, TrackLog
 from . import ui
 
 MAX_CAMERAS = 3          # default number of slots (app.py windows); webapp.py raises it with --max-cameras
+
+# The trained CMIO checkpoint picked up when no --race-classifier is given. Local
+# only (models/ is gitignored); delete it, or pass --no-race, to run without CMIO.
+DEFAULT_RACE_CLASSIFIER = "models/cmio.pt"
 
 
 @dataclass
@@ -50,6 +54,11 @@ class EngineConfig:
     realtime: bool = False
     no_loop: bool = False
     no_demographics: bool = False
+    # Trained CMIO checkpoint (TorchScript .pt or ONNX) - see humanmonitor/race_model.py.
+    # "" = models/cmio.pt when that file exists, otherwise no CMIO.
+    race_classifier: str = ""
+    no_race: bool = False
+    race_agree: float = RACE_AGREE     # share of a track's CMIO vote needed to report a group
     initial_count: int = 0            # people assumed inside at start-up (site-wide); 0 = count only what is seen
     debug_tracks: Optional[str] = None  # CSV path for a per-track decision log
     debug_every: int = 15
@@ -72,7 +81,8 @@ def _new_cam_id() -> int:
 
 
 PRESENT_ZERO = {"n": 0, "male": 0, "female": 0, "adult": 0, "child": 0,
-                "gender_unknown": 0, "age_unknown": 0}
+                "gender_unknown": 0, "age_unknown": 0,
+                "race_cn": 0, "race_my": 0, "race_in": 0, "race_ot": 0, "race_unknown": 0}
 
 
 @dataclass
@@ -170,6 +180,7 @@ class Engine:
         t0 = time.time()
         self.classifier = None if cfg.no_demographics else DemographicClassifier(cfg.clip, self.device)
         print(f"[init] classifier ready ({time.time() - t0:.1f}s)")
+        self.race = self._load_race(cfg)
 
         # fixed slots at start-up (empty ones hold a NullSource); the web UI adds / removes slots later
         self.cameras: list[Camera] = []
@@ -208,10 +219,39 @@ class Engine:
             self.detector.reset(i)
         if self.classifier is not None:
             self.classifier.classify([np.zeros((128, 64, 3), np.uint8)])
+        if self.race is not None:
+            self.race.predict(np.full((128, 64, 3), 114, np.uint8))
         if self.setup_mode:
             print("[setup] set-up mode: draw a trigger line on each camera, then save")
 
         self._worker = threading.Thread(target=self._pipeline_loop, name="pipeline", daemon=True)
+
+    def _load_race(self, cfg: EngineConfig):
+        """The trained CMIO classifier, or None (say which, out loud).
+
+        Rides on the gender / age crops, so it is off whenever demographics are.
+        A checkpoint that fails its load-time probe is refused rather than run:
+        wrong class order or a baked-in softmax is silent on a running console.
+        """
+        if cfg.no_demographics or cfg.no_race:
+            return None
+        path = cfg.race_classifier or (DEFAULT_RACE_CLASSIFIER if Path(DEFAULT_RACE_CLASSIFIER).exists() else "")
+        if not path:
+            print("[init] CMIO off - no models/cmio.pt and no --race-classifier")
+            return None
+        from .race_model import LocalRaceClassifier
+
+        # The checkpoint is a plain ResNet; Apple MPS gains little over CPU for one
+        # small crop at a time and has not been validated with it, so stay on CPU there.
+        device = "cpu" if self.device == "mps" else self.device
+        model = LocalRaceClassifier(path, device)
+        if not model.ready:
+            print(f"[init] CMIO off - {path} refused: {model.error}")
+            return None
+        print(f"[init] CMIO from the trained classifier {path} on {device} - PROVISIONAL, "
+              f"not validated against labelled crops; {cfg.race_agree:.0%} of a track's vote "
+              "needed to report a group")
+        return model
 
     # ----------------------------------------------------------- sources
     @staticmethod
@@ -354,7 +394,8 @@ class Engine:
 
     def _new_counter(self, cam: Camera, line: TriggerLine) -> LineCounter:
         lc = LineCounter(line, cam.source.width, cam.source.height,
-                         gender_thresh=self.cfg.gender_thresh, child_thresh=self.cfg.child_thresh)
+                         gender_thresh=self.cfg.gender_thresh, child_thresh=self.cfg.child_thresh,
+                         race_agree=self.cfg.race_agree)
         lc.configure_timing(cam.source.effective_fps)
         self._align_counter_memory(lc)
         return lc
@@ -530,11 +571,12 @@ class Engine:
                         if st and st.n_obs:
                             ev.gender, ev.age = st.decide(cam.counter.gender_thresh, cam.counter.child_thresh)
                             ev.p_male, ev.p_child, ev.n_obs = st.p_male, st.p_child, st.n_obs
+                            ev.race, ev.p_race = st.race_decision(cam.counter.race_agree)
                             # the counters are about to be moved by THIS decision, so it is also the
                             # one a later revision must undo - _commit_crossing recorded the vote from
                             # before the crossing look, and revising against that stale value would
                             # decrement a bucket that was never incremented
-                            st.last_gender, st.last_age = ev.gender, ev.age
+                            st.last_gender, st.last_age, st.last_race = ev.gender, ev.age, ev.race
                     self.stats.apply(cam.idx, ev)
                     self.log.write(cam.idx, cam.name, cam.source.src, ev)
                     cam.flash[ev.track_id] = (f.index, "ENTRY" if ev.direction > 0 else "EXIT")
@@ -548,7 +590,9 @@ class Engine:
                     for cb in self.listeners:
                         cb(rec)
                     print(f"[event] {cam.name}: {'ENTRY' if ev.direction > 0 else 'EXIT '} track #{ev.track_id} "
-                          f"gender={ev.gender} age={ev.age} (p_male={ev.p_male:.2f} p_child={ev.p_child:.2f} n={ev.n_obs})")
+                          f"gender={ev.gender} age={ev.age}"
+                          + (f" cmio={ev.race}" if self.race is not None else "")
+                          + f" (p_male={ev.p_male:.2f} p_child={ev.p_child:.2f} n={ev.n_obs})")
                 # A crossing is decided the instant the head crosses, when the person has
                 # only just walked into frame. Once the track has been watched for a few
                 # seconds the vote is much better informed, so move the count if it changed.
@@ -559,9 +603,10 @@ class Engine:
                     for rec in self.recent:   # keep the UI event feed consistent with the counters
                         if rec.cam_idx == cam.idx and rec.event.track_id == rev.track_id:
                             rec.event.gender, rec.event.age = rev.gender, rev.age
+                            rec.event.race, rec.event.p_race = rev.race, rev.p_race
                             break
                     print(f"[revise] {cam.name}: track #{rev.track_id} "
-                          f"{rev.old_gender}/{rev.old_age} -> {rev.gender}/{rev.age} "
+                          f"{rev.old_gender}/{rev.old_age}/{rev.old_race} -> {rev.gender}/{rev.age}/{rev.race} "
                           f"(p_male={rev.p_male:.2f} p_child={rev.p_child:.2f} n={rev.n_obs})")
             if self.track_log is not None and cam.counter is not None and f.index % self.cfg.debug_every == 0:
                 self.track_log.write(cam.idx, cam.name, f.index, tracks, cam.counter)
@@ -585,6 +630,8 @@ class Engine:
             g, a = st.decide(c.gender_thresh, c.child_thresh) if (st and c) else (UNKNOWN, UNKNOWN)
             out["male" if g == "M" else "female" if g == "F" else "gender_unknown"] += 1
             out["adult" if a == "A" else "child" if a == "C" else "age_unknown"] += 1
+            r = st.race_decision(c.race_agree)[0] if (st and c) else UNKNOWN
+            out[RACE_FIELD.get(r, "race_unknown")] += 1
         return out
 
     def _within_region(self, cam: Camera, tracks: list[Track]) -> list[Track]:
@@ -644,8 +691,10 @@ class Engine:
                     owners.append((cam, f, t))
         if not crops:
             return
-        for (cam, f, t), (p_male, p_child) in zip(owners, self.classifier.classify(crops)):
-            cam.counter.ensure_state(t.track_id, f.index).add_observation(p_male, p_child, f.index, t.height)
+        for (cam, f, t), crop, (p_male, p_child) in zip(owners, crops, self.classifier.classify(crops)):
+            st = cam.counter.ensure_state(t.track_id, f.index)
+            st.add_observation(p_male, p_child, f.index, t.height)
+            self._race_look(st, crop)
 
     def _classify_crossing(self, cam: Camera, f: Frame, tracks: list[Track], track_id: int) -> None:
         """Classify the person's crop at the moment they cross, weighted above the earlier looks."""
@@ -656,8 +705,9 @@ class Engine:
         if crop is None:
             return
         p_male, p_child = self.classifier.classify([crop])[0]
-        cam.counter.ensure_state(track_id, f.index).add_observation(
-            p_male, p_child, f.index, t.height, weight=CROSSING_WEIGHT)
+        st = cam.counter.ensure_state(track_id, f.index)
+        st.add_observation(p_male, p_child, f.index, t.height, weight=CROSSING_WEIGHT)
+        self._race_look(st, crop, weight=CROSSING_WEIGHT)
 
     def _classify_tracks(self, cam: Camera, f: Frame, tracks: list[Track], force: bool = False) -> None:
         crops, sel = [], []
@@ -667,8 +717,19 @@ class Engine:
                 crops.append(c)
                 sel.append(t)
         if crops:
-            for t, (p_male, p_child) in zip(sel, self.classifier.classify(crops)):
-                cam.counter.ensure_state(t.track_id, f.index).add_observation(p_male, p_child, f.index, t.height)
+            for t, crop, (p_male, p_child) in zip(sel, crops, self.classifier.classify(crops)):
+                st = cam.counter.ensure_state(t.track_id, f.index)
+                st.add_observation(p_male, p_child, f.index, t.height)
+                self._race_look(st, crop)
+
+    def _race_look(self, st, crop: np.ndarray, weight: float = 1.0) -> None:
+        """Show the same crop to the CMIO checkpoint and add its answer to the track's vote.
+
+        crop_person returns BGR (OpenCV frames); the checkpoint contract is RGB.
+        """
+        if self.race is None:
+            return
+        st.vote_race(self.race.predict(np.ascontiguousarray(crop[..., ::-1])), weight)
 
     # ------------------------------------------------------------- render
     def annotated_frame(self, cam: Camera, draft: bool = True) -> Optional[np.ndarray]:
@@ -721,4 +782,7 @@ class Engine:
         t = self.stats.total
         print(f"\n[summary] visitors={t.visitors} (entries {t.entries}, exits {t.exits})  "
               f"male={t.male} female={t.female}  adult={t.adult} child={t.child}")
+        if self.race is not None:
+            print(f"[summary] CMIO visitors (PROVISIONAL)  chinese={t.v_cn} malay={t.v_my} "
+                  f"indian={t.v_in} others={t.v_ot} unknown={t.v_race_unknown}")
         print(f"[summary] events written to {self.log.path}")

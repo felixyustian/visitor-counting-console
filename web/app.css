@@ -968,3 +968,15 @@ label.check { color: #14161a; }
 .console .console-foot .keys { font-family: var(--mono); font-size: 12px; margin-right: 14px; white-space: nowrap; }
 .console .console-foot .keys b { color: var(--c-text); font-weight: 700; }
 @container consolepanel (max-width: 760px) { .console .console-foot .keys { display: none; } }
+
+/* CMIO (trained classifier, provisional) - a compact row under VISITORS TODAY */
+:root { --cn: #e0564b; --my: #2fa66a; --in: #e69a2e; --ot: #8a8f99; }
+.cmio-tile .cmio-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: clamp(11px, 3.6cqi, 16px); }
+.cmio-tile .cmio-k { font-weight: 700; letter-spacing: .05em; font-size: .8em; }
+.cmio-tile .cmio-k em { font-style: normal; font-weight: 600; color: var(--c-muted, #8a8f99); margin-left: 4px; text-transform: uppercase; font-size: .85em; }
+.cmio-tile .cmio-row b { font-size: 1.25em; }
+.cmio-tile .cn, .tbl td.cn { color: var(--cn); } .cmio-tile .my, .tbl td.my { color: var(--my); }
+.cmio-tile .in, .tbl td.in { color: var(--in); } .cmio-tile .ot, .tbl td.ot { color: var(--ot); }
+.cmio-tile .unk { color: var(--c-muted, #8a8f99); }
+.bar i.cn { background: var(--cn); } .bar i.my { background: var(--my); }
+.bar i.in { background: var(--in); } .bar i.ot { background: var(--ot); }

@@ -18,6 +18,7 @@
   const fmtUptime = (s) => `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
   const GENDER = { M: "male", F: "female", "?": "?" };
   const AGE = { A: "adult", C: "child", "?": "?" };
+  const CMIO = ["cn", "my", "in", "ot"];
   const LEVEL_TEXT = { normal: "NORMAL", busy: "BUSY", crowded: "APPROACHING CAPACITY", over: "OVER CAPACITY" };
 
   function toast(msg, ms = 2400) {
@@ -488,6 +489,9 @@
     histLast: $("#hist-last"), histToday: $("#hist-today tbody"), histDays: $("#hist-days tbody"), histEvents: $("#hist-events tbody"),
     pause: $("#btn-pause"), foot: $("#foot-info"),
     vTotal: $("#v-total"), vMale: $("#v-male"), vFemale: $("#v-female"), vAdult: $("#v-adult"), vChild: $("#v-child"),
+    cmioTile: $("#cmio-tile"), vRun: $("#v-run"),
+    vCmio: Object.fromEntries(CMIO.map((k) => [k, $(`#v-${k}`)])),
+    vbarCmio: Object.fromEntries(CMIO.map((k) => [k, $(`#vbar-${k}`)])),
     vbarMale: $("#vbar-male"), vbarFemale: $("#vbar-female"), vbarAdult: $("#vbar-adult"), vbarChild: $("#vbar-child"), visSub: $("#vis-sub"),
     locRow: $("#loc-row"), locSub: $("#loc-sub"), occLabel: $("#occ-label"), occSub: $("#occ-sub"), oTotal: $("#o-total"),
     assumedNote: $("#assumed-note"),
@@ -724,6 +728,19 @@
     const vg = v.v_male + v.v_female, va = v.v_adult + v.v_child;
     el.vbarMale.style.width = `${vg ? (v.v_male / vg) * 100 : 50}%`; el.vbarFemale.style.width = `${vg ? (v.v_female / vg) * 100 : 50}%`;
     el.vbarAdult.style.width = `${va ? (v.v_adult / va) * 100 : 50}%`; el.vbarChild.style.width = `${va ? (v.v_child / va) * 100 : 50}%`;
+    // CMIO: shown only while the trained checkpoint is running. The bar shares out
+    // the people it decided; the undecided are counted beside it, never guessed into a group.
+    const cmioOn = !!(st.cmio && st.cmio.on);
+    el.cmioTile.classList.toggle("hidden", !cmioOn);
+    document.querySelectorAll(".cmio-col").forEach((n) => n.classList.toggle("hidden", !cmioOn));
+    if (cmioOn) {
+      const vr = CMIO.reduce((s, k) => s + (v[`v_${k}`] || 0), 0);
+      CMIO.forEach((k) => {
+        el.vCmio[k].textContent = v[`v_${k}`] || 0;
+        el.vbarCmio[k].style.width = `${vr ? ((v[`v_${k}`] || 0) / vr) * 100 : 25}%`;
+      });
+      el.vRun.textContent = v.v_race_unknown || 0;
+    }
 
     // alerts
     const active = st.alerts.filter((a) => !a.acked).length;
@@ -791,8 +808,8 @@
     // events
     el.eventsSub.textContent = st.events.length ? `latest ${st.events.length} crossings` : "no crossings yet";
     el.events.innerHTML = st.events.length
-      ? st.events.slice(0, 10).map((e) => `<tr><td class="mono">${fmtTime(e.t)}</td><td>${esc(e.cam_name)}</td><td class="${e.dir > 0 ? "entry" : "exit"}">${e.dir > 0 ? "ENTRY" : "EXIT"}</td><td class="${e.gender === "?" ? "q" : e.gender}">${GENDER[e.gender] || "?"}</td><td class="${e.age === "?" ? "q" : e.age}">${AGE[e.age] || "?"}</td><td class="mono q">#${e.track}</td></tr>`).join("")
-      : `<tr class="empty"><td colspan="6">waiting for the first crossing…</td></tr>`;
+      ? st.events.slice(0, 10).map((e) => `<tr><td class="mono">${fmtTime(e.t)}</td><td>${esc(e.cam_name)}</td><td class="${e.dir > 0 ? "entry" : "exit"}">${e.dir > 0 ? "ENTRY" : "EXIT"}</td><td class="${e.gender === "?" ? "q" : e.gender}">${GENDER[e.gender] || "?"}</td><td class="${e.age === "?" ? "q" : e.age}">${AGE[e.age] || "?"}</td>${cmioOn ? `<td class="${e.race && e.race !== "?" ? e.race.toLowerCase() : "q"}">${esc(e.race || "?")}</td>` : ""}<td class="mono q">#${e.track}</td></tr>`).join("")
+      : `<tr class="empty"><td colspan="${cmioOn ? 7 : 6}">waiting for the first crossing…</td></tr>`;
 
     renderHistory(history, st.recordings);
 

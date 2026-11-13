@@ -313,6 +313,10 @@ def draw_tracks(img: np.ndarray, tracks: list[Track], counter: LineCounter | Non
         if st and st.n_obs:
             conf = f" {max(st.p_male, 1 - st.p_male):.0%}/{max(st.p_child, 1 - st.p_child):.0%}"
         label = f"#{t.track_id} {g_word} {a_word}{conf}"
+        if st and st.race_views:
+            # CMIO is only on the label once the trained checkpoint has voted on this track
+            r, share = st.race_decision(counter.race_agree if counter is not None else 0.5)
+            label += f" {r}" + (f" {share:.0%}" if r != UNKNOWN else "")
         (tw, th), _ = cv2.getTextSize(label, D.F, 0.5, 1)
         ly = max(th + 4, y1 - 4)
         cv2.rectangle(img, (x1, ly - th - 4), (x1 + tw + 6, ly + 2), col, -1)

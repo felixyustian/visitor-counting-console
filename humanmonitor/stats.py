@@ -9,6 +9,12 @@ from typing import Optional
 
 from .counter import CrossEvent, Revision, UNKNOWN
 
+# CMIO code -> Counts field. Running buckets (moved by entries and exits) and the
+# day's visitors (entries only) are kept apart exactly as gender and age are.
+RACE_FIELD = {"CN": "race_cn", "MY": "race_my", "IN": "race_in", "OT": "race_ot"}
+RACE_V_FIELD = {"CN": "v_cn", "MY": "v_my", "IN": "v_in", "OT": "v_ot"}
+RACE_WORD = {"CN": "chinese", "MY": "malay", "IN": "indian", "OT": "others"}
+
 
 # Assumed make-up of the people already inside when the demo starts. The head count
 # is unknown in practice (nobody counted them in), so the baseline is an explicit
@@ -33,6 +39,18 @@ class Counts:
     v_female: int = 0
     v_adult: int = 0
     v_child: int = 0
+    # CMIO - only ever moved when a trained checkpoint is loaded. Nobody is assumed
+    # into these: the opening baseline is not split by race, so it stays out of them.
+    race_cn: int = 0
+    race_my: int = 0
+    race_in: int = 0
+    race_ot: int = 0
+    race_unknown: int = 0
+    v_cn: int = 0
+    v_my: int = 0
+    v_in: int = 0
+    v_ot: int = 0
+    v_race_unknown: int = 0
 
     @property
     def visitors(self) -> int:
@@ -56,6 +74,7 @@ class Counts:
         if d > 0:
             self.entries += 1
             self._visitor(ev.gender, ev.age, +1)
+            self._visitor_race(ev.race, +1)
         else:
             self.exits += 1
         if ev.gender == "M":
@@ -70,6 +89,7 @@ class Counts:
             self.child += d
         else:
             self.age_unknown += d
+        self._race(ev.race, d)
         # counters never go below zero (an exit of someone who entered before start-up)
         self._clamp()
 
@@ -83,6 +103,14 @@ class Counts:
         elif age == "C":
             self.v_child += sign
 
+    def _race(self, race: str, sign: int) -> None:
+        k = RACE_FIELD.get(race, "race_unknown")
+        setattr(self, k, getattr(self, k) + sign)
+
+    def _visitor_race(self, race: str, sign: int) -> None:
+        k = RACE_V_FIELD.get(race, "v_race_unknown")
+        setattr(self, k, getattr(self, k) + sign)
+
     @property
     def visitors_total(self) -> int:
         """Visitors who entered through the counted entrances (cumulative entries)."""
@@ -94,6 +122,10 @@ class Counts:
         if d > 0:
             self._visitor(rev.old_gender, rev.old_age, -1)
             self._visitor(rev.gender, rev.age, +1)
+            self._visitor_race(rev.old_race, -1)
+            self._visitor_race(rev.race, +1)
+        self._race(rev.old_race, -d)
+        self._race(rev.race, d)
         for label, sign in ((rev.old_gender, -d), (rev.gender, d)):
             if label == "M":
                 self.male += sign
@@ -139,7 +171,9 @@ class Counts:
         return self._split_to(max(0, self.visitors))
 
     def _clamp(self) -> None:
-        for k in ("male", "female", "adult", "child", "gender_unknown", "age_unknown", "v_male", "v_female", "v_adult", "v_child"):
+        for k in ("male", "female", "adult", "child", "gender_unknown", "age_unknown", "v_male", "v_female", "v_adult", "v_child",
+                  "race_cn", "race_my", "race_in", "race_ot", "race_unknown",
+                  "v_cn", "v_my", "v_in", "v_ot", "v_race_unknown"):
             if getattr(self, k) < 0:
                 setattr(self, k, 0)
 
@@ -223,7 +257,7 @@ class TrackLog:
     """
 
     HEADER = ["timestamp", "frame", "camera_id", "camera_name", "track_id", "x1", "y1", "x2", "y2",
-              "det_conf", "n_obs", "p_male", "p_child", "gender", "age"]
+              "det_conf", "n_obs", "p_male", "p_child", "gender", "age", "race", "p_race"]
 
     def __init__(self, path: Path | str):
         self.path = Path(path)
@@ -240,12 +274,14 @@ class TrackLog:
         for t in tracks:
             st = counter.get_state(t.track_id)
             g, a = st.decide(counter.gender_thresh, counter.child_thresh) if st else (UNKNOWN, UNKNOWN)
+            r, p_r = st.race_decision(counter.race_agree) if st else (UNKNOWN, 0.0)
             x1, y1, x2, y2 = t.box
             self._w.writerow([ts, frame_idx, cam_idx, cam_name, t.track_id, x1, y1, x2, y2,
                               f"{t.conf:.3f}", st.n_obs if st else 0,
                               f"{st.p_male:.3f}" if st else "", f"{st.p_child:.3f}" if st else "",
                               {"M": "male", "F": "female"}.get(g, "unknown"),
-                              {"A": "adult", "C": "child"}.get(a, "unknown")])
+                              {"A": "adult", "C": "child"}.get(a, "unknown"),
+                              RACE_WORD.get(r, "unknown"), f"{p_r:.3f}" if st and st.race_views else ""])
         self._fh.flush()
 
     def close(self) -> None:
@@ -263,7 +299,7 @@ class EventLog:
     """
 
     HEADER = ["timestamp", "camera_id", "camera_name", "source", "track_id", "direction",
-              "gender", "age", "p_male", "p_child", "n_obs", "event"]
+              "gender", "age", "p_male", "p_child", "n_obs", "event", "race", "p_race"]
 
     def __init__(self, path: Path | str):
         self.path = Path(path)
@@ -292,7 +328,8 @@ class EventLog:
         print(f"[events] {self.path} used older columns - moved to {backup.name}")
 
     def _row(self, cam_idx: int, cam_name: str, source: str, track_id: int, direction: int,
-             gender: str, age: str, p_male: float, p_child: float, n_obs: int, kind: str) -> None:
+             gender: str, age: str, p_male: float, p_child: float, n_obs: int, kind: str,
+             race: str = UNKNOWN, p_race: float = 0.0) -> None:
         self._w.writerow([
             time.strftime("%Y-%m-%dT%H:%M:%S"),
             cam_idx,
@@ -306,16 +343,20 @@ class EventLog:
             f"{p_child:.3f}",
             n_obs,
             kind,
+            RACE_WORD.get(race, "unknown"),
+            f"{p_race:.3f}",
         ])
         self._fh.flush()
 
     def write(self, cam_idx: int, cam_name: str, source: str, ev: CrossEvent) -> None:
         self._row(cam_idx, cam_name, source, ev.track_id, ev.direction,
-                  ev.gender, ev.age, ev.p_male, ev.p_child, ev.n_obs, "crossing")
+                  ev.gender, ev.age, ev.p_male, ev.p_child, ev.n_obs, "crossing",
+                  ev.race, ev.p_race)
 
     def write_revision(self, cam_idx: int, cam_name: str, source: str, rev: Revision) -> None:
         self._row(cam_idx, cam_name, source, rev.track_id, rev.direction,
-                  rev.gender, rev.age, rev.p_male, rev.p_child, rev.n_obs, "revision")
+                  rev.gender, rev.age, rev.p_male, rev.p_child, rev.n_obs, "revision",
+                  rev.race, rev.p_race)
 
     def close(self) -> None:
         self._fh.close()

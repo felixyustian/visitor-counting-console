@@ -74,3 +74,7 @@ config/sources.json
 # reach this public repository. Ignored here so a broad `git add` cannot sweep
 # it in if the folder is ever copied across.
 cv-counting-icd-proposal/
+
+# Trained model checkpoints and their provenance notes - local only, mirrored
+# from the private working repository and never published from here.
+models/

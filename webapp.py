@@ -319,14 +319,19 @@ class Console:
                 # net = entered - left, and its split: all detected, no assumed opening count
                 "net": c.entries - c.exits,
                 "n_male": c.net_split()[0], "n_female": c.net_split()[1],
-                "n_adult": c.net_split()[2], "n_child": c.net_split()[3]}
+                "n_adult": c.net_split()[2], "n_child": c.net_split()[3],
+                # CMIO (all zero without a trained checkpoint): running buckets and the day's visitors
+                "race_cn": c.race_cn, "race_my": c.race_my, "race_in": c.race_in, "race_ot": c.race_ot,
+                "race_unknown": c.race_unknown,
+                "v_cn": c.v_cn, "v_my": c.v_my, "v_in": c.v_in, "v_ot": c.v_ot, "v_race_unknown": c.v_race_unknown}
 
     @staticmethod
     def _event(rec: EventRecord) -> dict:
         ev = rec.event
         return {"t": rec.time, "cam": rec.cam_idx, "cam_name": rec.cam_name, "track": ev.track_id,
                 "dir": ev.direction, "gender": ev.gender, "age": ev.age,
-                "p_male": round(ev.p_male, 2), "p_child": round(ev.p_child, 2), "n_obs": ev.n_obs}
+                "p_male": round(ev.p_male, 2), "p_child": round(ev.p_child, 2), "n_obs": ev.n_obs,
+                "race": ev.race, "p_race": round(ev.p_race, 2)}
 
     def camera_dict(self, cam: Camera) -> dict:
         e = self.engine
@@ -377,6 +382,9 @@ class Console:
             "uptime": int(time.time() - e.started_at),
             "paused": e.paused,
             "setup_mode": e.setup_mode,
+            # whether CMIO is running, so the page can hide its panel rather than show zeros
+            "cmio": {"on": e.race is not None, "provisional": True,
+                     "model": e.race.path if e.race is not None else None},
             "max_cameras": e.cfg.max_cameras,
             "site": self.site.public(),
             "capacity": self.capacity,
