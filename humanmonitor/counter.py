@@ -14,7 +14,9 @@ from one stable side of the line to the other. Robustness measures:
   tracker ID switch and ignored.
 
 Each track also accumulates classifier probabilities; the decision reported on
-the crossing event is the average over all observations of that track.
+the crossing event is the average over all observations of that track. With a
+trained CMIO checkpoint loaded (humanmonitor/race_model.py) each look also
+casts a soft CMIO vote - see TrackState.vote_race.
 """
 from __future__ import annotations
 
@@ -50,6 +52,13 @@ UNKNOWN = "?"
 RECENT_OBS = 3               # recent observations kept for the gender vote
 CROSSING_WEIGHT = 2.0        # the look taken at the moment of crossing counts double
 
+# CMIO codes, in the Department of Statistics order the checkpoint contract fixes
+# (race_model.CMIO_ORDER). Two letters so a race never collides with an age code
+# ("C" is already a child).
+RACE_CHINESE, RACE_MALAY, RACE_INDIAN, RACE_OTHER = "CN", "MY", "IN", "OT"
+RACE_ORDER = (RACE_CHINESE, RACE_MALAY, RACE_INDIAN, RACE_OTHER)
+RACE_AGREE = 0.5             # share of a track's CMIO vote the leading group must hold
+
 
 @dataclass
 class TrackState:
@@ -73,6 +82,11 @@ class TrackState:
     # last emitted event (for exit-decrement bookkeeping and late revision)
     last_gender: str = UNKNOWN
     last_age: str = UNKNOWN
+    last_race: str = UNKNOWN
+    # CMIO soft vote: summed probability per code over every look (the crossing look
+    # weighted like the gender one), and how many looks it rests on
+    race_weight: dict = field(default_factory=dict)
+    race_views: int = 0
     last_direction: int = 0          # 0 = this track has never crossed
     revised: bool = False            # its matured vote has already been checked
 
@@ -100,6 +114,39 @@ class TrackState:
         """Age: mean over every observation - a noisy per-frame call that averages out."""
         return self.sum_child_all / self.n_obs if self.n_obs else 0.5
 
+    def vote_race(self, probs: Optional[dict], weight: float = 1.0) -> None:
+        """Add one look's CMIO distribution ({code: p}, as race_model.predict returns).
+
+        None - a crop too small to ask about - is not a vote: "not asked" and
+        "asked and undecided" are different facts, and only the second belongs
+        in the tally.
+        """
+        if not probs:
+            return
+        for code, p in probs.items():
+            self.race_weight[code] = self.race_weight.get(code, 0.0) + weight * float(p)
+        self.race_views += 1
+
+    def race_decision(self, agree: float = RACE_AGREE) -> tuple[str, float]:
+        """(CMIO code or "?", the winner's share of the vote).
+
+        Unknown when nothing was asked, when the checkpoint's own "unsure" class
+        leads, or when the leading group holds less than `agree` of the mass -
+        a person the model keeps changing its mind about is reported as unknown
+        rather than as whichever group happened to edge ahead. Ties go to the
+        real group in RACE_ORDER, never to "?".
+        """
+        mass = sum(self.race_weight.values())
+        if not mass:
+            return UNKNOWN, 0.0
+        code, won = min(self.race_weight.items(),
+                        key=lambda kv: (-kv[1], RACE_ORDER.index(kv[0])
+                                        if kv[0] in RACE_ORDER else len(RACE_ORDER)))
+        share = won / mass
+        if code not in RACE_ORDER or share < agree:
+            return UNKNOWN, share
+        return code, share
+
     def decide(self, gender_thresh: float = 0.5, child_thresh: float = 0.5) -> tuple[str, str]:
         if self.n_obs == 0:
             return UNKNOWN, UNKNOWN
@@ -119,6 +166,8 @@ class CrossEvent:
     p_male: float
     p_child: float
     n_obs: int
+    race: str = UNKNOWN    # "CN", "MY", "IN", "OT" or "?" (always "?" without a CMIO model)
+    p_race: float = 0.0    # the winning group's share of the track's CMIO vote
 
 
 @dataclass
@@ -140,6 +189,9 @@ class Revision:
     p_male: float
     p_child: float
     n_obs: int
+    old_race: str = UNKNOWN
+    race: str = UNKNOWN
+    p_race: float = 0.0
 
 
 @dataclass
@@ -162,6 +214,7 @@ class LineCounter:
     stitch_height_ratio: float = 1.33    # ...and at a similar size (so a child's history never passes to a parent)
     gender_thresh: float = 0.5
     child_thresh: float = 0.5
+    race_agree: float = RACE_AGREE
     states: dict[int, TrackState] = field(default_factory=dict)
     recent_events: list[CrossEvent] = field(default_factory=list)
 
@@ -270,12 +323,14 @@ class LineCounter:
         # dead-zone and the confirm_frames debounce instead.
         direction = 1 if new_side == self.line.entry_side else -1
         gender, age = st.decide(self.gender_thresh, self.child_thresh)
-        ev = CrossEvent(t.track_id, direction, gender, age, t.head, frame_idx, st.p_male, st.p_child, st.n_obs)
+        race, p_race = st.race_decision(self.race_agree)
+        ev = CrossEvent(t.track_id, direction, gender, age, t.head, frame_idx, st.p_male, st.p_child, st.n_obs,
+                        race, p_race)
         if self._is_duplicate(ev, st):
             return None
         self.recent_events.append(ev)
         st.last_event_frame = frame_idx
-        st.last_gender, st.last_age = gender, age
+        st.last_gender, st.last_age, st.last_race = gender, age, race
         st.last_direction, st.revised = direction, False
         return ev
 
@@ -340,11 +395,13 @@ class LineCounter:
                 continue
             st.revised = True
             gender, age = st.decide(self.gender_thresh, self.child_thresh)
-            if gender == st.last_gender and age == st.last_age:
+            race, p_race = st.race_decision(self.race_agree)
+            if gender == st.last_gender and age == st.last_age and race == st.last_race:
                 continue
             out.append(Revision(st.track_id, st.last_direction, st.last_gender, st.last_age,
-                                gender, age, st.p_male, st.p_child, st.n_obs))
-            st.last_gender, st.last_age = gender, age
+                                gender, age, st.p_male, st.p_child, st.n_obs,
+                                st.last_race, race, p_race))
+            st.last_gender, st.last_age, st.last_race = gender, age, race
         return out
 
     def _is_duplicate(self, ev: CrossEvent, st: TrackState) -> bool:

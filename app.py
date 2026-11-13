@@ -225,6 +225,12 @@ def add_engine_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--realtime", action="store_true", help="pace processing at the files' (strided) frame rate")
     p.add_argument("--no-loop", action="store_true", help="do not loop video files")
     p.add_argument("--no-demographics", action="store_true", help="counting only (skip gender/age model)")
+    p.add_argument("--race-classifier", default="",
+                   help="trained CMIO checkpoint (TorchScript .pt or ONNX, contract in humanmonitor/race_model.py); "
+                        "default models/cmio.pt when present. PROVISIONAL - not validated on labelled crops")
+    p.add_argument("--no-race", action="store_true", help="skip CMIO even when models/cmio.pt is present")
+    p.add_argument("--race-agree", type=float, default=0.5,
+                   help="share of a track's CMIO vote the leading group must hold; below it the person is CMIO-unknown")
 
 
 def check_sources(p: argparse.ArgumentParser, sources: list[str]) -> None:
